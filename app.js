@@ -757,7 +757,10 @@ const ShoppingList = (() => {
   }
 
   async function sheetWrite(action, params) {
-    if (!hasScript()) return false; // signal: write not attempted
+    if (!hasScript()) {
+      console.warn('[ShoppingList] sheetWrite skipped — scriptUrl not configured');
+      return false;
+    }
     let url = cfg.scriptUrl + '?action=' + action;
     if (params) {
       Object.keys(params).forEach(k => {
@@ -767,18 +770,25 @@ const ShoppingList = (() => {
         url += '&' + k + '=' + encodeURIComponent(v);
       });
     }
+    console.log('[ShoppingList] sheetWrite →', action, url);
     const res = await fetch(url);
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json().catch(() => ({}));
+    console.log('[ShoppingList] sheetWrite ←', action, data);
     if (data.ok === false) throw new Error(data.error || 'Script error');
-    return true; // signal: write confirmed
+    return true;
   }
 
   async function syncToSheet() {
+    console.log('[ShoppingList] syncToSheet start, dirty:', dirty, 'items:', items.map(i => i.text));
     dirty = true;
     const wrote = await sheetWrite('sync', { items: items.map(i => i.text) });
-    if (!wrote) return; // no script configured — keep dirty=true so seedFromCsv can't overwrite
+    if (!wrote) {
+      console.warn('[ShoppingList] syncToSheet: write skipped, dirty stays true');
+      return;
+    }
     dirty = false;
+    console.log('[ShoppingList] syncToSheet: write confirmed, dirty cleared');
     await syncFromSheet();
   }
 
@@ -1007,14 +1017,19 @@ const ShoppingList = (() => {
   }
 
   async function syncFromSheet() {
-    if (!hasScript()) return;
+    if (!hasScript()) {
+      console.log('[ShoppingList] syncFromSheet skipped — no script URL');
+      return;
+    }
+    console.log('[ShoppingList] syncFromSheet: reading from script…');
     try {
       const fresh = await sheetRead();
+      console.log('[ShoppingList] syncFromSheet: got', fresh.length, 'items:', fresh.map(i => i.text));
       items = fresh;
       Storage.save(items);
       render();
     } catch (err) {
-      console.warn('[ShoppingList] sync failed:', err.message);
+      console.warn('[ShoppingList] syncFromSheet failed:', err.message);
     }
   }
 
@@ -1029,7 +1044,11 @@ const ShoppingList = (() => {
   }
 
   async function seedFromCsv() {
-    if (dirty) return; // local changes not yet written — don't overwrite
+    console.log('[ShoppingList] seedFromCsv called, dirty:', dirty);
+    if (dirty) {
+      console.warn('[ShoppingList] seedFromCsv blocked — dirty flag set, keeping local state');
+      return;
+    }
     const { spreadsheetId, sheetName } = cfg;
     if (!spreadsheetId || spreadsheetId === 'YOUR_SPREADSHEET_ID') {
       DOM.shoppingMeta.textContent = 'Add Spreadsheet ID in config';
@@ -1053,6 +1072,7 @@ const ShoppingList = (() => {
   }
 
   function init() {
+    console.log('[ShoppingList] init — hasScript:', hasScript(), '| scriptUrl:', cfg.scriptUrl);
     if (hasScript()) {
       const stored = Storage.load();
       if (stored && Array.isArray(stored) && stored.length > 0) {
