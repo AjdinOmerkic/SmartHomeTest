@@ -2,15 +2,17 @@
  * Smart Home Dashboard — app.js
  *
  * Architecture:
- *   Config       — all user-editable values in one place
- *   uid()        — unique ID generator
- *   Storage      — localStorage persistence for shopping list
- *   Clock        — updates time/date every second
- *   Weather      — fetches OpenWeatherMap, updates every 10 min
- *   ShoppingList — localStorage-backed list; seeds from Google Sheets on first load
- *                  supports add, long-press-select, delete selected, clear all
- *   Modes        — controls SCREENSAVER ↔ SHOPPING transitions
- *   Inactivity   — detects user interaction, drives mode switching
+ *   Config        — all user-editable values in one place
+ *   uid()         — unique ID generator
+ *   Storage       — localStorage persistence for shopping list
+ *   Clock         — updates time/date every second
+ *   Weather       — fetches Open-Meteo, updates every 10 min
+ *   News          — fetches RSS from Bosnian news sites via CORS proxy
+ *   ShoppingList  — localStorage-backed list; seeds from Google Sheets on first load
+ *                   supports add, long-press-select, delete selected, clear all
+ *   Modes         — manages SAVER (clock/news sub-screens) ↔ SHOPPING transitions
+ *   SwipeHandler  — horizontal swipe cycles saver sub-screens; tap opens shopping
+ *   Inactivity    — drives auto-return to saver after idle timeout
  */
 
 'use strict';
@@ -21,80 +23,146 @@
 const CONFIG = {
 
   /* ── Inactivity ─────────────────────────────────────── */
-  inactivitySeconds: 15,          // seconds before screensaver activates
+  inactivitySeconds: 15,
 
   /* ── Google Sheets (no API key required) ───────────── */
-  // 1. Create a Google Sheet with column A header "Item", items below.
-  // 2. File → Share → Publish to web → Sheet1 → CSV → Publish.
-  //    (Alternatively: Share → Anyone with the link → Viewer is enough.)
-  // 3. Paste your Spreadsheet ID below (from the sheet URL).
-  // No API key, no Google Cloud account needed.
   sheets: {
     spreadsheetId: '1m9IoejCF9aqKx5yWTKRQXkWQt-pH00ZcCimQ-KrHcNg',
-    sheetName:     'Sheet1',                 // tab name (must match exactly)
+    sheetName:     'Sheet1',
+    scriptUrl:     'YOUR_APPS_SCRIPT_URL',
   },
 
-  /* ── OpenWeatherMap ─────────────────────────────────── */
-  // 1. Sign up at openweathermap.org (free tier is sufficient).
-  // 2. Generate an API key.
-  // 3. Set your location coordinates below.
+  /* ── Weather (Open-Meteo — free, no API key) ────────── */
   weather: {
-    apiKey:    '2128a3acf79c2a2080a85974224acf4c',
-    latitude:  '44.53598540715475',   // Donji Mosnik, Tuzla, Bosnia
+    latitude:  '44.53598540715475',
     longitude: '18.66269391653291',
-    units:     'metric',              // °C
-    updateIntervalMs: 600_000,  // refresh weather every 10 minutes
+    updateIntervalMs: 600_000,
   },
 
   /* ── Shopping list ──────────────────────────────────── */
   shopping: {
-    updateIntervalMs: 300_000,   // refresh list every 5 minutes
+    updateIntervalMs: 300_000,
+  },
+
+  /* ── News RSS sources ───────────────────────────────── */
+  news: {
+    updateIntervalMs: 300_000,   // refresh every 5 minutes
+    maxItems: 12,                // headlines per source
+    sources: [
+      { label: 'Klix.ba',     rss: 'https://www.klix.ba/rss/vijesti' },
+      { label: 'Oslobođenje', rss: 'https://oslobodjenje.ba/rss/feed' },
+      { label: 'Avaz',        rss: 'https://avaz.ba/rss' },
+    ],
   },
 
 };
 
 /* ═══════════════════════════════════════════════════════════
-   WEATHER ICON MAP
-   Maps OpenWeatherMap condition codes to emoji
+   TRANSLATIONS — English and Bosnian
 ═══════════════════════════════════════════════════════════ */
-const WEATHER_ICONS = {
-  // Group 2xx: Thunderstorm
-  200: '⛈️', 201: '⛈️', 202: '⛈️', 210: '🌩️', 211: '🌩️',
-  212: '🌩️', 221: '🌩️', 230: '⛈️', 231: '⛈️', 232: '⛈️',
-  // Group 3xx: Drizzle
-  300: '🌦️', 301: '🌦️', 302: '🌦️', 310: '🌦️', 311: '🌦️',
-  312: '🌧️', 313: '🌧️', 314: '🌧️', 321: '🌧️',
-  // Group 5xx: Rain
-  500: '🌧️', 501: '🌧️', 502: '🌧️', 503: '🌧️', 504: '🌧️',
-  511: '🌨️', 520: '🌧️', 521: '🌧️', 522: '🌧️', 531: '🌧️',
-  // Group 6xx: Snow
-  600: '🌨️', 601: '❄️', 602: '❄️', 611: '🌨️', 612: '🌨️',
-  613: '🌨️', 615: '🌨️', 616: '🌨️', 620: '🌨️', 621: '🌨️', 622: '❄️',
-  // Group 7xx: Atmosphere
-  701: '🌫️', 711: '🌫️', 721: '🌫️', 731: '💨', 741: '🌫️',
-  751: '💨', 761: '💨', 762: '🌋', 771: '💨', 781: '🌪️',
-  // Group 800: Clear
-  800: '☀️',
-  // Group 80x: Clouds
-  801: '🌤️', 802: '⛅', 803: '🌥️', 804: '☁️',
+const TRANSLATIONS = {
+  en: {
+    days:   ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'],
+    months: ['January','February','March','April','May','June',
+             'July','August','September','October','November','December'],
+    shoppingTitle:  'Shopping List',
+    addPlaceholder: 'Add item…',
+    cancel:         'Cancel',
+    clearAll:       'Clear All',
+    sure:           'Sure?',
+    allDone:        'All done!',
+    listEmpty:      'List is empty',
+    failedLoad:     'Could not load list',
+    tapHint:        'Tap anywhere · Swipe for news',
+    weatherUnavail: 'Weather unavailable',
+    itemCount: function(n) { return n + ' item' + (n !== 1 ? 's' : ''); },
+    selected:  function(n) { return n + ' selected'; },
+    deleteBtn: function(n) { return n > 0 ? 'Delete (' + n + ')' : 'Delete'; },
+    wmo: {
+      0:'Clear sky', 1:'Mainly clear', 2:'Partly cloudy', 3:'Overcast',
+      45:'Fog', 48:'Icy fog',
+      51:'Light drizzle', 53:'Drizzle', 55:'Heavy drizzle',
+      56:'Freezing drizzle', 57:'Heavy freezing drizzle',
+      61:'Light rain', 63:'Rain', 65:'Heavy rain',
+      66:'Freezing rain', 67:'Heavy freezing rain',
+      71:'Light snow', 73:'Snow', 75:'Heavy snow', 77:'Snow grains',
+      80:'Showers', 81:'Rain showers', 82:'Heavy showers',
+      85:'Snow showers', 86:'Heavy snow showers',
+      95:'Thunderstorm', 96:'Thunderstorm & hail', 99:'Thunderstorm & hail',
+    },
+  },
+  bs: {
+    days:   ['Nedjelja','Ponedjeljak','Utorak','Srijeda','Četvrtak','Petak','Subota'],
+    months: ['Januar','Februar','Mart','April','Maj','Juni',
+             'Juli','August','Septembar','Oktobar','Novembar','Decembar'],
+    shoppingTitle:  'Lista kupovine',
+    addPlaceholder: 'Dodaj stavku…',
+    cancel:         'Otkaži',
+    clearAll:       'Obriši sve',
+    sure:           'Sigurno?',
+    allDone:        'Gotovo!',
+    listEmpty:      'Lista je prazna',
+    failedLoad:     'Greška pri učitavanju',
+    tapHint:        'Tapnite · Prevucite za vijesti',
+    weatherUnavail: 'Nema vremenskih podataka',
+    itemCount: function(n) {
+      if (n === 1) return '1 stavka';
+      if (n >= 2 && n <= 4) return n + ' stavke';
+      return n + ' stavki';
+    },
+    selected:  function(n) { return n + ' odabrano'; },
+    deleteBtn: function(n) { return n > 0 ? 'Obriši (' + n + ')' : 'Obriši'; },
+    wmo: {
+      0:'Vedro nebo', 1:'Uglavnom vedro', 2:'Djelimično oblačno', 3:'Oblačno',
+      45:'Magla', 48:'Smrznuta magla',
+      51:'Slaba rosulja', 53:'Rosulja', 55:'Jaka rosulja',
+      56:'Smrznuta rosulja', 57:'Jaka smrznuta rosulja',
+      61:'Slaba kiša', 63:'Kiša', 65:'Jaka kiša',
+      66:'Smrznuta kiša', 67:'Jaka smrznuta kiša',
+      71:'Slabi snijeg', 73:'Snijeg', 75:'Jak snijeg', 77:'Snježne pahulje',
+      80:'Pljuskovi', 81:'Kišni pljuskovi', 82:'Jaki pljuskovi',
+      85:'Snježni pljuskovi', 86:'Jaki snježni pljuskovi',
+      95:'Grmljavina', 96:'Grmljavina s gradom', 99:'Grmljavina s gradom',
+    },
+  },
 };
 
-function getWeatherIcon(code) {
-  return WEATHER_ICONS[code] || '🌡️';
-}
+/* ═══════════════════════════════════════════════════════════
+   WMO WEATHER CODE MAPS
+═══════════════════════════════════════════════════════════ */
+const WMO_ICONS = {
+  0:'☀️', 1:'🌤️', 2:'⛅', 3:'☁️',
+  45:'🌫️', 48:'🌫️',
+  51:'🌦️', 53:'🌦️', 55:'🌧️',
+  56:'🌧️', 57:'🌧️',
+  61:'🌧️', 63:'🌧️', 65:'🌧️',
+  66:'🌨️', 67:'🌨️',
+  71:'🌨️', 73:'❄️', 75:'❄️', 77:'❄️',
+  80:'🌧️', 81:'🌧️', 82:'🌧️',
+  85:'🌨️', 86:'🌨️',
+  95:'⛈️', 96:'⛈️', 99:'⛈️',
+};
+
+function wmoIcon(code) { return WMO_ICONS[code] || '🌡️'; }
+function wmoDesc(code) { return (I18n.t().wmo[code]) || '—'; }
 
 /* ═══════════════════════════════════════════════════════════
    HELPERS
 ═══════════════════════════════════════════════════════════ */
-
-// Short unique ID — used to tag shopping list items
 function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 }
 
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
 /* ═══════════════════════════════════════════════════════════
    MODULE: Storage
-   Persists the shopping list to localStorage as JSON.
 ═══════════════════════════════════════════════════════════ */
 const Storage = (() => {
   const KEY = 'shl_v1';
@@ -113,11 +181,81 @@ const Storage = (() => {
 })();
 
 /* ═══════════════════════════════════════════════════════════
+   MODULE: I18n
+═══════════════════════════════════════════════════════════ */
+const I18n = (() => {
+  let lang = localStorage.getItem('lang') || 'en';
+
+  function t() { return TRANSLATIONS[lang]; }
+  function getLang() { return lang; }
+
+  function apply() {
+    const tr  = t();
+    const next = lang === 'en' ? 'BS' : 'EN';
+
+    DOM.tapHint.textContent       = tr.tapHint;
+    DOM.shoppingTitle.textContent = tr.shoppingTitle;
+    DOM.addInput.placeholder      = tr.addPlaceholder;
+    DOM.emptyText.textContent     = tr.allDone;
+    DOM.btnCancelSel.textContent  = tr.cancel;
+    if (DOM.btnClearAll.dataset.confirm !== '1') {
+      DOM.btnClearAll.textContent = tr.clearAll;
+    }
+    DOM.btnLang.textContent      = next;
+    DOM.btnLangSaver.textContent = next;
+    Clock.resetDate();
+    Weather.refreshDesc();
+  }
+
+  function setLang(l) {
+    lang = l;
+    localStorage.setItem('lang', l);
+    apply();
+  }
+
+  function toggle() { setLang(lang === 'en' ? 'bs' : 'en'); }
+
+  function init() {
+    apply();
+    DOM.btnLang.addEventListener('click',     e => { e.stopPropagation(); toggle(); });
+    DOM.btnLangSaver.addEventListener('click', e => { e.stopPropagation(); toggle(); });
+  }
+
+  return { init, t, getLang };
+})();
+
+/* ═══════════════════════════════════════════════════════════
+   MODULE: Theme
+═══════════════════════════════════════════════════════════ */
+const Theme = (() => {
+  let current = localStorage.getItem('theme') || 'dark';
+
+  function apply() {
+    document.documentElement.dataset.theme = current;
+    DOM.btnTheme.textContent = current === 'dark' ? '☀️' : '🌙';
+  }
+
+  function toggle() {
+    current = current === 'dark' ? 'light' : 'dark';
+    localStorage.setItem('theme', current);
+    apply();
+  }
+
+  function init() {
+    apply();
+    DOM.btnTheme.addEventListener('click', e => { e.stopPropagation(); toggle(); });
+  }
+
+  return { init };
+})();
+
+/* ═══════════════════════════════════════════════════════════
    DOM REFERENCES — cached once at startup
 ═══════════════════════════════════════════════════════════ */
 const DOM = {
   // Screens
   screensaver:     document.getElementById('screensaver'),
+  news:            document.getElementById('news'),
   shopping:        document.getElementById('shopping'),
   // Clock
   clockTime:       document.getElementById('clock-time'),
@@ -131,6 +269,10 @@ const DOM = {
   weatherForecast: document.getElementById('weather-forecast'),
   weatherError:    document.getElementById('weather-error'),
   tapHint:         document.getElementById('tap-hint'),
+  // News
+  newsFeed:        document.getElementById('news-feed'),
+  newsTabs:        document.getElementById('news-tabs'),
+  newsUpdated:     document.getElementById('news-updated'),
   // Shopping list
   shoppingList:    document.getElementById('shopping-list'),
   shoppingMeta:    document.getElementById('shopping-meta'),
@@ -154,20 +296,21 @@ const DOM = {
   returnBarFill:   document.getElementById('return-bar-fill'),
   // Nav
   btnScreensaver:  document.getElementById('btn-screensaver'),
+  // Language & theme
+  btnLang:         document.getElementById('btn-lang'),
+  btnLangSaver:    document.getElementById('btn-lang-saver'),
+  btnTheme:        document.getElementById('btn-theme'),
+  shoppingTitle:   document.getElementById('shopping-title'),
+  emptyText:       document.getElementById('empty-text'),
 };
 
 /* ═══════════════════════════════════════════════════════════
    MODULE: Clock
 ═══════════════════════════════════════════════════════════ */
 const Clock = (() => {
-  const DAYS   = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-  const MONTHS = ['January','February','March','April','May','June',
-                  'July','August','September','October','November','December'];
-
-  // Pad a number to two digits
   function pad(n) { return n < 10 ? '0' + n : '' + n; }
 
-  let prevMin = -1;  // avoid unnecessary DOM writes
+  let prevMin = -1;
 
   function tick() {
     const now  = new Date();
@@ -175,24 +318,25 @@ const Clock = (() => {
     const mins = now.getMinutes();
     const secs = now.getSeconds();
 
-    // Seconds always update
     DOM.clockSeconds.textContent = pad(secs);
 
-    // Hours:minutes only when minute changes
     if (mins !== prevMin) {
       prevMin = mins;
+      const tr = I18n.t();
       DOM.clockTime.textContent = pad(hrs) + ':' + pad(mins);
       DOM.clockDate.textContent =
-        DAYS[now.getDay()] + ', ' + MONTHS[now.getMonth()] + ' ' + now.getDate();
+        tr.days[now.getDay()] + ', ' + tr.months[now.getMonth()] + ' ' + now.getDate();
     }
   }
 
+  function resetDate() { prevMin = -1; }
+
   function init() {
-    tick(); // immediate render, no blank flash
+    tick();
     setInterval(tick, 1000);
   }
 
-  return { init };
+  return { init, resetDate };
 })();
 
 /* ═══════════════════════════════════════════════════════════
@@ -200,113 +344,64 @@ const Clock = (() => {
 ═══════════════════════════════════════════════════════════ */
 const Weather = (() => {
   const cfg = CONFIG.weather;
+  let lastCode = null;
 
-  function unitSymbol() {
-    return cfg.units === 'imperial' ? '°F' : '°C';
-  }
-
-  function fmt(temp) {
-    return Math.round(temp) + unitSymbol();
-  }
+  function fmt(temp) { return Math.round(temp) + '°C'; }
 
   function showError() {
     DOM.weatherError.classList.remove('hidden');
     DOM.weatherForecast.innerHTML = '';
   }
 
-  function renderCurrent(data) {
-    const { weather, main } = data;
-    const condition = weather[0];
-    DOM.weatherIcon.textContent = getWeatherIcon(condition.id);
-    DOM.weatherTemp.textContent = fmt(main.temp);
-    DOM.weatherDesc.textContent = condition.description;
-    DOM.weatherHiLo.textContent = 'H: ' + fmt(main.temp_max) + '  ·  L: ' + fmt(main.temp_min);
-    DOM.weatherError.classList.add('hidden');
+  function refreshDesc() {
+    if (lastCode !== null) DOM.weatherDesc.textContent = wmoDesc(lastCode);
   }
 
-  function renderForecast(forecastData) {
-    // The 5-day/3-hour forecast: pick one reading per day (noon preferred)
-    const dayMap = {};
-    const today  = new Date().getDate();
+  function render(data) {
+    const SHORT = I18n.t().days.map(d => d.slice(0, 3));
+    const cur   = data.current;
+    const daily = data.daily;
 
-    forecastData.list.forEach(entry => {
-      const d    = new Date(entry.dt * 1000);
-      const key  = d.toDateString();
-      const hour = d.getHours();
+    lastCode = cur.weather_code;
+    DOM.weatherIcon.textContent = wmoIcon(cur.weather_code);
+    DOM.weatherTemp.textContent = fmt(cur.temperature_2m);
+    DOM.weatherDesc.textContent = wmoDesc(cur.weather_code);
+    DOM.weatherHiLo.textContent =
+      'H: ' + fmt(daily.temperature_2m_max[0]) +
+      '  ·  L: ' + fmt(daily.temperature_2m_min[0]);
+    DOM.weatherError.classList.add('hidden');
 
-      // Skip today
-      if (d.getDate() === today) return;
-
-      // Prefer the noon reading, otherwise take the first available
-      if (!dayMap[key] || (hour === 12)) {
-        dayMap[key] = entry;
-      }
-    });
-
-    const days  = Object.values(dayMap).slice(0, 4);
-    const SHORT = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-
-    DOM.weatherForecast.innerHTML = '';
-
-    // Build all nodes in a fragment — one DOM insertion
     const frag = document.createDocumentFragment();
-
-    days.forEach(entry => {
-      const d    = new Date(entry.dt * 1000);
-      const icon = getWeatherIcon(entry.weather[0].id);
-
-      const card  = document.createElement('div');
+    for (let i = 1; i <= 4; i++) {
+      if (!daily.time[i]) break;
+      const d    = new Date(daily.time[i] + 'T12:00:00');
+      const card = document.createElement('div');
       card.className = 'forecast-day';
       card.innerHTML =
-        '<span class="forecast-day-name">' + SHORT[d.getDay()] + '</span>' +
-        '<span class="forecast-icon">'    + icon                    + '</span>' +
-        '<span class="forecast-high">'    + fmt(entry.main.temp_max)+ '</span>' +
-        '<span class="forecast-low">'     + fmt(entry.main.temp_min)+ '</span>';
-
+        '<span class="forecast-day-name">' + SHORT[d.getDay()]                + '</span>' +
+        '<span class="forecast-icon">'     + wmoIcon(daily.weather_code[i])   + '</span>' +
+        '<span class="forecast-high">'     + fmt(daily.temperature_2m_max[i]) + '</span>' +
+        '<span class="forecast-low">'      + fmt(daily.temperature_2m_min[i]) + '</span>';
       frag.appendChild(card);
-    });
-
+    }
+    DOM.weatherForecast.innerHTML = '';
     DOM.weatherForecast.appendChild(frag);
   }
 
   async function fetchWeather() {
-    const { apiKey, latitude, longitude, units } = cfg;
-
-    if (!apiKey || apiKey === 'YOUR_OPENWEATHER_API_KEY') {
-      DOM.weatherDesc.textContent = 'Add API key in config';
-      return;
-    }
-
+    const { latitude, longitude } = cfg;
+    const url =
+      'https://api.open-meteo.com/v1/forecast' +
+      '?latitude='  + latitude +
+      '&longitude=' + longitude +
+      '&current=temperature_2m,weather_code' +
+      '&daily=weather_code,temperature_2m_max,temperature_2m_min' +
+      '&timezone=auto' +
+      '&forecast_days=5';
     try {
-      const [currentRes, forecastRes] = await Promise.all([
-        fetch(
-          'https://api.openweathermap.org/data/2.5/weather' +
-          '?lat=' + latitude +
-          '&lon=' + longitude +
-          '&units=' + units +
-          '&appid=' + apiKey
-        ),
-        fetch(
-          'https://api.openweathermap.org/data/2.5/forecast' +
-          '?lat=' + latitude +
-          '&lon=' + longitude +
-          '&units=' + units +
-          '&appid=' + apiKey
-        ),
-      ]);
-
-      if (!currentRes.ok || !forecastRes.ok) {
-        throw new Error('HTTP ' + currentRes.status);
-      }
-
-      const [currentData, forecastData] = await Promise.all([
-        currentRes.json(),
-        forecastRes.json(),
-      ]);
-
-      renderCurrent(currentData);
-      renderForecast(forecastData);
-
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      render(await res.json());
     } catch (err) {
       console.warn('[Weather] fetch failed:', err.message);
       showError();
@@ -318,51 +413,252 @@ const Weather = (() => {
     setInterval(fetchWeather, cfg.updateIntervalMs);
   }
 
+  return { init, refreshDesc };
+})();
+
+/* ═══════════════════════════════════════════════════════════
+   MODULE: News
+   Fetches RSS feeds from Bosnian news sites via CORS proxy.
+   Renders a scrollable headline list; tabs switch sources.
+═══════════════════════════════════════════════════════════ */
+const News = (() => {
+  const cfg = CONFIG.news;
+
+  // Two public CORS proxies, tried in order on failure
+  const PROXIES = [
+    url => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url),
+    url => 'https://corsproxy.io/?' + encodeURIComponent(url),
+  ];
+
+  let currentSrc = 0;
+  let cache = {};  // source index → articles array
+
+  // ─── Fetch with timeout and proxy fallback ───────────────
+
+  async function fetchWithTimeout(url, ms) {
+    const ctrl  = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), ms);
+    try {
+      const res = await fetch(url, { signal: ctrl.signal });
+      clearTimeout(timer);
+      return res;
+    } catch (e) {
+      clearTimeout(timer);
+      throw e;
+    }
+  }
+
+  async function fetchRSS(rssUrl) {
+    let lastErr;
+    for (const proxy of PROXIES) {
+      try {
+        const res = await fetchWithTimeout(proxy(rssUrl), 9000);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return parseRSS(await res.text());
+      } catch (e) {
+        lastErr = e;
+        console.warn('[News] proxy failed, trying next:', e.message);
+      }
+    }
+    throw lastErr;
+  }
+
+  // ─── RSS / Atom parser ───────────────────────────────────
+
+  function parseRSS(xmlText) {
+    const doc = new DOMParser().parseFromString(xmlText, 'application/xml');
+
+    // Abort if parser returned an error document
+    if (doc.querySelector('parsererror')) throw new Error('XML parse error');
+
+    // RSS 2.0 uses <item>, Atom uses <entry>
+    let items = [...doc.querySelectorAll('item')];
+    const isAtom = items.length === 0;
+    if (isAtom) items = [...doc.querySelectorAll('entry')];
+
+    return items.slice(0, cfg.maxItems).map(el => {
+      const title = el.querySelector('title')?.textContent?.trim() || '';
+      const link  = isAtom
+        ? (el.querySelector('link')?.getAttribute('href') || el.querySelector('link')?.textContent?.trim() || '')
+        : (el.querySelector('link')?.textContent?.trim() || '');
+      const dateStr = isAtom
+        ? (el.querySelector('published')?.textContent || el.querySelector('updated')?.textContent || '')
+        : (el.querySelector('pubDate')?.textContent || '');
+      return { title, link, pubDate: dateStr.trim() };
+    }).filter(a => a.title);
+  }
+
+  // ─── Relative time ───────────────────────────────────────
+
+  function relTime(dateStr) {
+    if (!dateStr) return '';
+    try {
+      const diffMin = (Date.now() - new Date(dateStr).getTime()) / 60000;
+      if (diffMin < 1)    return 'upravo';
+      if (diffMin < 60)   return Math.floor(diffMin) + ' min';
+      if (diffMin < 1440) return Math.floor(diffMin / 60) + ' h';
+      return Math.floor(diffMin / 1440) + ' d';
+    } catch { return ''; }
+  }
+
+  // ─── Render ──────────────────────────────────────────────
+
+  function render(articles) {
+    const feed = DOM.newsFeed;
+
+    if (!articles || articles.length === 0) {
+      feed.innerHTML = '<div class="news-error">No articles found</div>';
+      return;
+    }
+
+    const frag = document.createDocumentFragment();
+    articles.forEach((a, i) => {
+      const item = document.createElement('div');
+      item.className = 'news-item';
+      item.style.animationDelay = Math.min(i * 35, 300) + 'ms';
+
+      const time = relTime(a.pubDate);
+      item.innerHTML =
+        '<div class="news-item-title">' + escHtml(a.title) + '</div>' +
+        (time ? '<div class="news-item-time">' + time + '</div>' : '');
+      frag.appendChild(item);
+    });
+
+    feed.innerHTML = '';
+    feed.appendChild(frag);
+    feed.scrollTop = 0;
+  }
+
+  function showLoading() {
+    DOM.newsFeed.innerHTML = '<div class="news-loading">Loading…</div>';
+  }
+
+  function showError(msg) {
+    DOM.newsFeed.innerHTML = '<div class="news-error">' + escHtml(msg || 'Could not load news') + '</div>';
+  }
+
+  // ─── Load a source (with cache) ──────────────────────────
+
+  async function loadSource(idx, forceRefresh) {
+    if (!forceRefresh && cache[idx]) {
+      render(cache[idx]);
+      return;
+    }
+
+    showLoading();
+    try {
+      const articles = await fetchRSS(cfg.sources[idx].rss);
+      cache[idx] = articles;
+      if (currentSrc === idx) {
+        render(articles);
+        const now = new Date();
+        DOM.newsUpdated.textContent =
+          'Updated ' + now.getHours() + ':' + String(now.getMinutes()).padStart(2, '0');
+      }
+    } catch (e) {
+      console.warn('[News] failed source', idx, e);
+      if (currentSrc === idx) showError('Could not load — check connection');
+    }
+  }
+
+  // ─── Switch active tab ───────────────────────────────────
+
+  function switchSource(idx) {
+    currentSrc = idx;
+    DOM.newsTabs.querySelectorAll('.news-tab').forEach((tab, i) => {
+      tab.classList.toggle('active', i === idx);
+    });
+    loadSource(idx);
+  }
+
+  // ─── Refresh all cached sources ──────────────────────────
+
+  function refresh() {
+    cache = {};
+    loadSource(currentSrc, true);
+  }
+
+  // ─── Init ───────────────────────────────────────────────
+
+  function init() {
+    DOM.newsTabs.querySelectorAll('.news-tab').forEach((tab, i) => {
+      tab.addEventListener('click', e => {
+        e.stopPropagation();
+        switchSource(i);
+        Inactivity.reset();
+      });
+    });
+
+    loadSource(0);
+    setInterval(refresh, cfg.updateIntervalMs);
+  }
+
   return { init };
 })();
 
 /* ═══════════════════════════════════════════════════════════
    MODULE: ShoppingList
-   Source of truth: localStorage (key "shl_v1").
-   On first ever load (empty storage) it seeds from Google Sheets.
-   Supports: add item, long-press → select, delete selected, clear all.
 ═══════════════════════════════════════════════════════════ */
 const ShoppingList = (() => {
   const cfg = CONFIG.sheets;
 
-  let items    = [];        // [{ id: string, text: string }, ...]
-  let selected = new Set(); // IDs of currently selected items
-  let inSel    = false;     // whether selection mode is active
+  let items    = [];
+  let selected = new Set();
+  let inSel    = false;
 
-  // ─── Item operations ────────────────────────────────────
+  function hasScript() {
+    return cfg.scriptUrl && cfg.scriptUrl !== 'YOUR_APPS_SCRIPT_URL';
+  }
+
+  async function sheetRead() {
+    const res  = await fetch(cfg.scriptUrl + '?action=list');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'Script error');
+    return data.items.map(text => ({ id: uid(), text }));
+  }
+
+  function sheetWrite(action, params) {
+    if (!hasScript()) return;
+    let url = cfg.scriptUrl + '?action=' + action;
+    if (params) {
+      Object.keys(params).forEach(k => {
+        const v = typeof params[k] === 'object'
+          ? JSON.stringify(params[k])
+          : String(params[k]);
+        url += '&' + k + '=' + encodeURIComponent(v);
+      });
+    }
+    fetch(url).catch(err => console.warn('[ShoppingList] write failed:', err.message));
+  }
 
   function addItem(text) {
     const t = text.trim();
     if (!t) return;
     items.unshift({ id: uid(), text: t });
     Storage.save(items);
+    sheetWrite('add', { item: t });
     render();
   }
 
   function removeSelected() {
     items = items.filter(item => !selected.has(item.id));
     Storage.save(items);
-    exitSelectionMode(); // also calls render()
+    sheetWrite('sync', { items: items.map(i => i.text) });
+    exitSelectionMode();
   }
 
   function clearAll() {
     items = [];
     Storage.save(items);
-    exitSelectionMode(); // also calls render()
+    sheetWrite('clear');
+    exitSelectionMode();
   }
-
-  // ─── Selection mode ─────────────────────────────────────
 
   function enterSelectionMode(firstId) {
     inSel = true;
     selected.clear();
     selected.add(firstId);
-    // Show selection bar, hide countdown bar
     DOM.selectionBar.classList.remove('hidden');
     DOM.returnBar.classList.add('hidden');
     render();
@@ -380,20 +676,18 @@ const ShoppingList = (() => {
   function toggleSelect(id) {
     if (selected.has(id)) { selected.delete(id); }
     else                  { selected.add(id);    }
-    // Update just this one card — avoids full re-render during selection
     const card = DOM.shoppingList.querySelector('[data-id="' + id + '"]');
     if (card) card.classList.toggle('selected', selected.has(id));
     updateSelBar();
   }
 
   function updateSelBar() {
-    const n = selected.size;
-    DOM.selCount.textContent   = n + ' selected';
-    DOM.btnDeleteSel.textContent = n > 0 ? 'Delete (' + n + ')' : 'Delete';
-    DOM.btnDeleteSel.disabled  = (n === 0);
+    const n  = selected.size;
+    const tr = I18n.t();
+    DOM.selCount.textContent     = tr.selected(n);
+    DOM.btnDeleteSel.textContent = tr.deleteBtn(n);
+    DOM.btnDeleteSel.disabled    = (n === 0);
   }
-
-  // ─── Long press detection ────────────────────────────────
 
   function addLongPress(el, cb) {
     let timer = null;
@@ -407,29 +701,26 @@ const ShoppingList = (() => {
     el.addEventListener('mouseleave',  abort);
   }
 
-  // ─── Rendering ──────────────────────────────────────────
-
   function render() {
     DOM.shoppingError.classList.add('hidden');
+    const tr = I18n.t();
 
     if (items.length === 0) {
       DOM.shoppingList.innerHTML = '';
       DOM.shoppingEmpty.classList.remove('hidden');
-      DOM.shoppingMeta.textContent = 'List is empty';
+      DOM.shoppingMeta.textContent = tr.listEmpty;
       return;
     }
 
     DOM.shoppingEmpty.classList.add('hidden');
-    DOM.shoppingMeta.textContent =
-      items.length + ' item' + (items.length !== 1 ? 's' : '');
+    DOM.shoppingMeta.textContent = tr.itemCount(items.length);
 
     const frag = document.createDocumentFragment();
 
     items.forEach((item, idx) => {
       const card = document.createElement('div');
-      card.className = 'card' + (selected.has(item.id) ? ' selected' : '');
+      card.className  = 'card' + (selected.has(item.id) ? ' selected' : '');
       card.dataset.id = item.id;
-      // Stagger entrance animation only on fresh renders, not selection toggles
       card.style.animationDelay = inSel ? '0ms' : Math.min(idx * 30, 270) + 'ms';
 
       const bullet = document.createElement('div');
@@ -437,7 +728,7 @@ const ShoppingList = (() => {
 
       const text = document.createElement('div');
       text.className   = 'card-text';
-      text.textContent = item.text;   // textContent — XSS safe
+      text.textContent = item.text;
 
       const check = document.createElement('div');
       check.className   = 'card-check';
@@ -447,15 +738,8 @@ const ShoppingList = (() => {
       card.appendChild(text);
       card.appendChild(check);
 
-      // Long press → enter selection (only when not already in selection mode)
-      addLongPress(card, () => {
-        if (!inSel) enterSelectionMode(item.id);
-      });
-
-      // Tap → toggle if already selecting
-      card.addEventListener('click', () => {
-        if (inSel) toggleSelect(item.id);
-      });
+      addLongPress(card, () => { if (!inSel) enterSelectionMode(item.id); });
+      card.addEventListener('click', () => { if (inSel) toggleSelect(item.id); });
 
       frag.appendChild(card);
     });
@@ -464,13 +748,11 @@ const ShoppingList = (() => {
     DOM.shoppingList.appendChild(frag);
   }
 
-  // ─── Add form ───────────────────────────────────────────
-
   function showAddForm() {
     DOM.addForm.classList.remove('hidden');
     DOM.btnAdd.style.visibility = 'hidden';
     DOM.addInput.value = '';
-    setTimeout(() => DOM.addInput.focus(), 60); // let animation finish first
+    setTimeout(() => DOM.addInput.focus(), 60);
   }
 
   function hideAddForm() {
@@ -485,7 +767,17 @@ const ShoppingList = (() => {
     hideAddForm();
   }
 
-  // ─── Google Sheets seed (first load only) ───────────────
+  async function syncFromSheet() {
+    if (!hasScript()) return;
+    try {
+      const fresh = await sheetRead();
+      items = fresh;
+      Storage.save(items);
+      render();
+    } catch (err) {
+      console.warn('[ShoppingList] sync failed:', err.message);
+    }
+  }
 
   function parseCsv(raw) {
     const lines = raw.split('\n');
@@ -497,7 +789,7 @@ const ShoppingList = (() => {
     return out;
   }
 
-  async function seedFromSheets() {
+  async function seedFromCsv() {
     const { spreadsheetId, sheetName } = cfg;
     if (!spreadsheetId || spreadsheetId === 'YOUR_SPREADSHEET_ID') {
       DOM.shoppingMeta.textContent = 'Add Spreadsheet ID in config';
@@ -509,115 +801,206 @@ const ShoppingList = (() => {
         '/gviz/tq?tqx=out:csv&sheet=' + encodeURIComponent(sheetName);
       const res = await fetch(url);
       if (!res.ok) throw new Error('HTTP ' + res.status);
-      const csv = await res.text();
-      items = parseCsv(csv);
+      items = parseCsv(await res.text());
       Storage.save(items);
       render();
     } catch (err) {
-      console.warn('[ShoppingList] seed failed:', err.message);
+      console.warn('[ShoppingList] CSV seed failed:', err.message);
       DOM.shoppingError.classList.remove('hidden');
       DOM.shoppingErrTxt.textContent = 'Check sharing settings or Spreadsheet ID';
-      DOM.shoppingMeta.textContent   = 'Failed to load';
+      DOM.shoppingMeta.textContent   = I18n.t().failedLoad;
     }
   }
 
-  // ─── Init ───────────────────────────────────────────────
-
   function init() {
-    // Use localStorage if it has data; otherwise pull from Google Sheets
-    const stored = Storage.load();
-    if (stored && Array.isArray(stored) && stored.length > 0) {
-      // Migrate old format (plain strings → objects) if needed
-      items = stored.map(item =>
-        typeof item === 'string' ? { id: uid(), text: item } : item
-      );
-      render();
+    if (hasScript()) {
+      const stored = Storage.load();
+      if (stored && Array.isArray(stored) && stored.length > 0) {
+        items = stored.map(item =>
+          typeof item === 'string' ? { id: uid(), text: item } : item
+        );
+        render();
+      }
+      syncFromSheet();
     } else {
-      seedFromSheets();
+      const stored = Storage.load();
+      if (stored && Array.isArray(stored) && stored.length > 0) {
+        items = stored.map(item =>
+          typeof item === 'string' ? { id: uid(), text: item } : item
+        );
+        render();
+      } else {
+        seedFromCsv();
+      }
     }
 
-    // Add form
-    DOM.btnAdd.addEventListener('click', e => { e.stopPropagation(); showAddForm(); });
-    DOM.btnAddConfirm.addEventListener('click', e => { e.stopPropagation(); confirmAdd(); });
+    DOM.btnAdd.addEventListener('click',       e => { e.stopPropagation(); showAddForm();  });
+    DOM.btnAddConfirm.addEventListener('click', e => { e.stopPropagation(); confirmAdd();  });
     DOM.btnAddCancel.addEventListener('click',  e => { e.stopPropagation(); hideAddForm(); });
     DOM.addInput.addEventListener('keydown', e => {
       if (e.key === 'Enter')  { e.preventDefault(); confirmAdd(); }
       if (e.key === 'Escape') { hideAddForm(); }
     });
 
-    // Selection bar
     DOM.btnCancelSel.addEventListener('click', e => { e.stopPropagation(); exitSelectionMode(); });
     DOM.btnDeleteSel.addEventListener('click', e => { e.stopPropagation(); removeSelected(); });
     DOM.btnClearAll.addEventListener('click', e => {
       e.stopPropagation();
-      // Two-tap confirmation: tap once → "Sure?", tap again → clear
       if (DOM.btnClearAll.dataset.confirm === '1') {
         clearAll();
       } else {
         DOM.btnClearAll.dataset.confirm = '1';
-        DOM.btnClearAll.textContent = 'Sure?';
+        DOM.btnClearAll.textContent     = I18n.t().sure;
         setTimeout(() => {
           if (DOM.btnClearAll.dataset.confirm === '1') {
             DOM.btnClearAll.dataset.confirm = '0';
-            DOM.btnClearAll.textContent = 'Clear All';
+            DOM.btnClearAll.textContent     = I18n.t().clearAll;
           }
         }, 2500);
       }
     });
   }
 
-  return { init, exitSelectionMode };
+  return { init, exitSelectionMode, syncFromSheet };
 })();
 
 /* ═══════════════════════════════════════════════════════════
    MODULE: Modes
-   Manages SCREENSAVER ↔ SHOPPING transitions
+   current: 'saver' | 'shopping'
+   saverIndex: 0 = clock+weather, 1 = news
 ═══════════════════════════════════════════════════════════ */
 const Modes = (() => {
-  let current = 'screensaver';   // 'screensaver' | 'shopping'
+  let current    = 'saver';
+  let saverIndex = 0;
 
-  function activateScreensaver() {
-    if (current === 'screensaver') return;
-    current = 'screensaver';
-    DOM.shopping.classList.remove('active');
-    DOM.screensaver.classList.add('active');
-    Inactivity.stopCountdown();
-    ShoppingList.exitSelectionMode(); // clean up any in-progress selection
+  const SAVER_ELS = () => [DOM.screensaver, DOM.news];
+
+  // Update dot indicators across all saver screens.
+  // Each .saver-dots container has one dot per screen in order, so
+  // dot position within its container = i % numScreens.
+  function updateDots(idx) {
+    const n = SAVER_ELS().length;
+    document.querySelectorAll('.saver-dots .dot').forEach((dot, i) => {
+      dot.classList.toggle('dot-active', (i % n) === idx);
+    });
   }
 
-  function initButton() {
-    DOM.btnScreensaver.addEventListener('click', function (e) {
-      e.stopPropagation(); // don't let the click bubble and immediately re-open shopping
-      activateScreensaver();
-    });
+  // Show a specific saver sub-screen
+  function showSaver(idx) {
+    const els = SAVER_ELS();
+    els.forEach((el, i) => el.classList.toggle('active', i === idx));
+    saverIndex = idx;
+    updateDots(idx);
+  }
+
+  // Cycle saver screens by direction (+1 or -1)
+  function switchSaver(dir) {
+    const n    = SAVER_ELS().length;
+    const next = ((saverIndex + dir) % n + n) % n;
+    showSaver(next);
+  }
+
+  function activateScreensaver() {
+    if (current === 'saver') return;
+    current = 'saver';
+    DOM.shopping.classList.remove('active');
+    showSaver(saverIndex);
+    Inactivity.stopCountdown();
+    ShoppingList.exitSelectionMode();
   }
 
   function activateShopping() {
     if (current === 'shopping') return;
     current = 'shopping';
-    DOM.screensaver.classList.remove('active');
+    SAVER_ELS().forEach(el => el.classList.remove('active'));
     DOM.shopping.classList.add('active');
     DOM.shoppingList.scrollTop = 0;
-    // Hide tap hint permanently after first interaction
+    ShoppingList.syncFromSheet();
     DOM.tapHint.classList.add('hidden');
   }
 
-  function toggle() {
-    if (current === 'screensaver') {
-      activateShopping();
-    }
-    // Tapping shopping mode just resets inactivity timer (handled by Inactivity)
+  function getCurrent()    { return current; }
+  function getSaverIndex() { return saverIndex; }
+
+  function initButton() {
+    DOM.btnScreensaver.addEventListener('click', e => {
+      e.stopPropagation();
+      activateScreensaver();
+    });
   }
 
-  function getCurrent() { return current; }
+  return {
+    activateScreensaver,
+    activateShopping,
+    switchSaver,
+    getCurrent,
+    getSaverIndex,
+    initButton,
+  };
+})();
 
-  return { activateScreensaver, activateShopping, toggle, getCurrent, initButton };
+/* ═══════════════════════════════════════════════════════════
+   MODULE: SwipeHandler
+   On saver screens:
+     - Horizontal swipe → cycle saver sub-screens
+     - Tap (no significant movement, no button target) → open shopping
+   On shopping screen: no navigation (handled by button + inactivity)
+═══════════════════════════════════════════════════════════ */
+const SwipeHandler = (() => {
+  const SWIPE_THRESHOLD = 55;   // minimum horizontal px to count as a swipe
+  const TAP_MAX_MOVE    = 18;   // max movement in px to still count as a tap
+  const TAP_MAX_MS      = 350;  // max duration in ms to count as a tap
+
+  let startX = 0, startY = 0, startTime = 0;
+
+  function init() {
+    document.addEventListener('touchstart', e => {
+      startX    = e.touches[0].clientX;
+      startY    = e.touches[0].clientY;
+      startTime = Date.now();
+    }, { passive: true });
+
+    document.addEventListener('touchend', e => {
+      if (Modes.getCurrent() !== 'saver') return;
+
+      const dx    = e.changedTouches[0].clientX - startX;
+      const dy    = e.changedTouches[0].clientY - startY;
+      const dt    = Date.now() - startTime;
+      const absDx = Math.abs(dx);
+      const absDy = Math.abs(dy);
+
+      const isHSwipe = absDx >= SWIPE_THRESHOLD && absDx > absDy * 1.5 && dt < 600;
+      const isTap    = absDx < TAP_MAX_MOVE && absDy < TAP_MAX_MOVE && dt < TAP_MAX_MS;
+
+      if (isHSwipe) {
+        // swipe left (dx < 0) → next screen; swipe right (dx > 0) → prev screen
+        Modes.switchSaver(dx < 0 ? 1 : -1);
+        Inactivity.reset();
+      } else if (isTap) {
+        // Don't navigate when tapping an interactive control
+        const target = e.target;
+        if (target.closest('button, a, input, select')) return;
+        Modes.activateShopping();
+        Inactivity.reset();
+      }
+    }, { passive: true });
+
+    // Mouse fallback for desktop testing
+    document.addEventListener('click', e => {
+      if (Modes.getCurrent() !== 'saver') return;
+      if (e.target.closest('button, a, input, select')) return;
+      Modes.activateShopping();
+      Inactivity.reset();
+    });
+  }
+
+  return { init };
 })();
 
 /* ═══════════════════════════════════════════════════════════
    MODULE: Inactivity
-   Detects user interaction and drives mode switching.
-   Also manages the countdown bar in shopping mode.
+   Resets timer on any interaction.
+   After timeout while in shopping mode → return to saver.
 ═══════════════════════════════════════════════════════════ */
 const Inactivity = (() => {
   const TIMEOUT_MS = CONFIG.inactivitySeconds * 1000;
@@ -625,12 +1008,10 @@ const Inactivity = (() => {
   let   barTimer   = null;
   let   barStart   = 0;
 
-  // Animate the return bar using rAF for smoothness
   function animateBar() {
     const elapsed  = Date.now() - barStart;
     const fraction = Math.max(0, 1 - elapsed / TIMEOUT_MS);
     DOM.returnBarFill.style.transform = 'scaleX(' + fraction + ')';
-
     if (fraction > 0) {
       barTimer = requestAnimationFrame(animateBar);
     }
@@ -653,42 +1034,39 @@ const Inactivity = (() => {
 
   function reset() {
     clearTimeout(timer);
-
     if (Modes.getCurrent() === 'shopping') {
       startCountdown();
     }
-
     timer = setTimeout(() => {
       Modes.activateScreensaver();
     }, TIMEOUT_MS);
   }
 
   function init() {
-    const EVENTS = ['touchstart', 'touchmove', 'mousedown', 'mousemove', 'click', 'keydown', 'scroll'];
-
+    // Reset inactivity timer on any interaction.
+    // SwipeHandler handles mode switching for saver screens — we only track activity here.
+    const EVENTS = ['touchstart', 'touchmove', 'mousedown', 'mousemove', 'keydown', 'scroll'];
     EVENTS.forEach(evt => {
-      document.addEventListener(evt, () => {
-        // First interaction on screensaver: switch modes
-        if (Modes.getCurrent() === 'screensaver') {
-          Modes.activateShopping();
-        }
-        reset();
-      }, { passive: true });
+      document.addEventListener(evt, reset, { passive: true });
     });
 
-    reset(); // start the initial timer
+    reset();
   }
 
-  return { init, stopCountdown };
+  return { init, stopCountdown, reset };
 })();
 
 /* ═══════════════════════════════════════════════════════════
-   BOOT — initialise all modules
+   BOOT
 ═══════════════════════════════════════════════════════════ */
 (function boot() {
+  Theme.init();
+  I18n.init();
   Clock.init();
   Weather.init();
+  News.init();
   ShoppingList.init();
+  SwipeHandler.init();
   Inactivity.init();
   Modes.initButton();
 })();

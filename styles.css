@@ -1,14 +1,8 @@
 /* ═══════════════════════════════════════════════════════════
    SMART HOME DASHBOARD — styles.css
-   Color palette:
-     --charcoal   #1a1c14   (background)
-     --surface    #23261a   (card surface)
-     --surface2   #2c3020   (elevated surface)
-     --olive      #7c8a3a   (primary)
-     --forest     #3d4f1e   (secondary)
-     --gold       #c9a84c   (accent)
-     --text       #e8e4d4   (primary text)
-     --text-dim   #9e9c8a   (secondary text)
+   Two themes:
+     dark  (default) — dark matte charcoal + olive + gold
+     light           — warm beige neumorphism + olive accents
 ═══════════════════════════════════════════════════════════ */
 
 /* ─── Reset & base ─────────────────────────────────────── */
@@ -19,6 +13,7 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+/* ── Dark theme (default) ───────────────────────────────── */
 :root {
   --charcoal:   #1a1c14;
   --surface:    #23261a;
@@ -32,6 +27,30 @@
   --danger:     #c0392b;
   --radius:     18px;
   --transition: 600ms cubic-bezier(0.4, 0, 0.2, 1);
+  /* Neumorphism shadows — off in dark mode */
+  --neu-dark:  transparent;
+  --neu-light: transparent;
+  --neu-inset-dark:  transparent;
+  --neu-inset-light: transparent;
+}
+
+/* ── Light beige neumorphism theme ──────────────────────── */
+[data-theme="light"] {
+  --charcoal:  #e8e0ce;
+  --surface:   #ede6d4;
+  --surface2:  #ddd6c4;
+  --olive:     #6b7a30;
+  --forest:    #4a5e20;
+  --gold:      #7c8a3a;
+  --gold-dim:  #5a6a28;
+  --text:      #252210;
+  --text-dim:  #6b6040;
+  --danger:    #b03020;
+  /* Neumorphism shadow pair: warm dark + clean light */
+  --neu-dark:  rgba(148, 136, 96, 0.55);
+  --neu-light: rgba(255, 255, 248, 0.95);
+  --neu-inset-dark:  rgba(148, 136, 96, 0.45);
+  --neu-inset-light: rgba(255, 255, 248, 0.85);
 }
 
 html, body {
@@ -45,6 +64,8 @@ html, body {
   touch-action: manipulation;
   user-select: none;
   -webkit-user-select: none;
+  /* Smooth theme crossfade */
+  transition: background-color 350ms ease, color 350ms ease;
 }
 
 /* ─── Screen containers ─────────────────────────────────── */
@@ -742,6 +763,406 @@ html, body {
   letter-spacing: 0.04em;
   flex: 1;
   text-align: center;
+}
+
+/* ─── Screensaver utility controls (lang + theme) ──────── */
+.saver-controls {
+  position: absolute;
+  bottom: 5vh;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-between;
+  padding: 0 5vw;
+  z-index: 5;
+  pointer-events: all;
+}
+
+.saver-btn {
+  background: rgba(44, 48, 32, 0.45);
+  border: 1px solid rgba(201, 168, 76, 0.18);
+  border-radius: 50px;
+  color: var(--text-dim);
+  font-size: clamp(12px, 2vw, 16px);
+  font-family: inherit;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  padding: 0.5em 1.1em;
+  min-width: 52px;
+  min-height: 40px;
+  cursor: pointer;
+  transition: background 200ms ease, border-color 200ms ease, color 200ms ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.saver-btn:active {
+  background: rgba(201, 168, 76, 0.2);
+  border-color: rgba(201, 168, 76, 0.5);
+  color: var(--gold);
+}
+
+/* Language button in shopping header */
+.btn-header-icon {
+  margin-left: auto;
+  background: rgba(44, 48, 32, 0.5);
+  border: 1px solid rgba(201, 168, 76, 0.18);
+  border-radius: 50px;
+  color: var(--text-dim);
+  font-size: clamp(12px, 2.2vw, 16px);
+  font-family: inherit;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  padding: 0.4em 1em;
+  min-width: 48px;
+  min-height: 40px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 200ms ease, border-color 200ms ease, color 200ms ease;
+}
+
+.btn-header-icon:active {
+  background: rgba(201, 168, 76, 0.15);
+  border-color: rgba(201, 168, 76, 0.45);
+  color: var(--gold);
+}
+
+/* ─── Light neumorphism overrides ───────────────────────── */
+
+/* Raised surface — used for cards, weather block, forecasts */
+.neu-raised {
+  box-shadow:
+    6px 6px 16px var(--neu-dark),
+    -6px -6px 16px var(--neu-light);
+}
+
+[data-theme="light"] #screensaver {
+  background: var(--charcoal);
+}
+
+[data-theme="light"] .bg-blob { opacity: 0.10; }
+
+[data-theme="light"] .clock-time {
+  color: var(--text);
+  text-shadow: none;
+}
+
+[data-theme="light"] .weather-current {
+  background: var(--charcoal);
+  border: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow:
+    6px 6px 16px var(--neu-dark),
+    -6px -6px 16px var(--neu-light);
+}
+
+[data-theme="light"] .forecast-day {
+  background: var(--charcoal);
+  border: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow:
+    4px 4px 10px var(--neu-dark),
+    -4px -4px 10px var(--neu-light);
+}
+
+[data-theme="light"] .saver-btn {
+  background: var(--charcoal);
+  border: none;
+  color: var(--text-dim);
+  box-shadow:
+    4px 4px 10px var(--neu-dark),
+    -4px -4px 10px var(--neu-light);
+}
+
+[data-theme="light"] .saver-btn:active {
+  box-shadow:
+    inset 3px 3px 7px var(--neu-inset-dark),
+    inset -3px -3px 7px var(--neu-inset-light);
+  color: var(--olive);
+}
+
+[data-theme="light"] .card {
+  background: var(--charcoal);
+  border: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow:
+    6px 6px 14px var(--neu-dark),
+    -6px -6px 14px var(--neu-light);
+}
+
+[data-theme="light"] .card:active {
+  box-shadow:
+    inset 4px 4px 10px var(--neu-inset-dark),
+    inset -4px -4px 10px var(--neu-inset-light);
+}
+
+[data-theme="light"] .card.selected {
+  background: var(--charcoal);
+  border: none;
+  box-shadow:
+    inset 4px 4px 10px var(--neu-inset-dark),
+    inset -4px -4px 10px var(--neu-inset-light),
+    0 0 18px rgba(107, 122, 48, 0.25);
+  animation: itemFloat 2.2s ease-in-out infinite;
+}
+
+[data-theme="light"] .card-bullet {
+  background: var(--olive);
+  box-shadow: 0 0 6px rgba(107, 122, 48, 0.35);
+}
+
+[data-theme="light"] .card-check {
+  background: var(--olive);
+  color: #fff;
+}
+
+[data-theme="light"] .shopping-header {
+  background: linear-gradient(180deg, var(--charcoal) 60%, transparent);
+}
+
+[data-theme="light"] .add-form {
+  background: var(--charcoal);
+  border-bottom-color: rgba(107, 122, 48, 0.2);
+}
+
+[data-theme="light"] .add-input {
+  background: var(--surface2);
+  color: var(--text);
+  border-color: rgba(107, 122, 48, 0.25);
+  box-shadow:
+    inset 3px 3px 7px var(--neu-inset-dark),
+    inset -3px -3px 7px var(--neu-inset-light);
+}
+
+[data-theme="light"] .add-input:focus {
+  border-color: var(--olive);
+  box-shadow:
+    inset 3px 3px 7px var(--neu-inset-dark),
+    inset -3px -3px 7px var(--neu-inset-light),
+    0 0 0 2px rgba(107, 122, 48, 0.18);
+}
+
+[data-theme="light"] .btn-form-confirm {
+  background: var(--olive);
+  color: #fff;
+}
+
+[data-theme="light"] .btn-form-cancel {
+  background: var(--surface2);
+  box-shadow:
+    3px 3px 7px var(--neu-dark),
+    -3px -3px 7px var(--neu-light);
+  border: none;
+}
+
+[data-theme="light"] .btn-add {
+  background: var(--olive);
+  color: #fff;
+  box-shadow:
+    5px 5px 14px var(--neu-dark),
+    -5px -5px 14px var(--neu-light),
+    0 0 20px rgba(107, 122, 48, 0.3);
+}
+
+[data-theme="light"] .selection-bar {
+  background: var(--surface);
+  border-top-color: rgba(107, 122, 48, 0.2);
+  box-shadow: 0 -4px 14px var(--neu-dark);
+}
+
+[data-theme="light"] .sel-cancel {
+  background: var(--charcoal);
+  color: var(--text-dim);
+  border: none;
+  box-shadow:
+    3px 3px 7px var(--neu-dark),
+    -3px -3px 7px var(--neu-light);
+}
+
+[data-theme="light"] .sel-delete {
+  background: rgba(176, 48, 32, 0.12);
+  color: #b03020;
+  border-color: rgba(176, 48, 32, 0.3);
+}
+
+[data-theme="light"] .sel-danger {
+  background: rgba(176, 48, 32, 0.08);
+  color: #b03020;
+  border-color: rgba(176, 48, 32, 0.2);
+}
+
+[data-theme="light"] .btn-screensaver,
+[data-theme="light"] .btn-header-icon {
+  background: var(--charcoal);
+  border: none;
+  color: var(--text-dim);
+  box-shadow:
+    3px 3px 8px var(--neu-dark),
+    -3px -3px 8px var(--neu-light);
+}
+
+[data-theme="light"] .tap-hint { color: var(--text-dim); }
+
+[data-theme="light"] .return-bar { background: rgba(0,0,0,0.08); }
+[data-theme="light"] .return-bar-fill {
+  background: linear-gradient(90deg, var(--forest), var(--olive));
+}
+
+/* ─── Saver screen indicator dots ──────────────────────── */
+.saver-dots {
+  position: absolute;
+  bottom: 8.5vh;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 10px;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-dim);
+  opacity: 0.3;
+  transition: opacity 350ms ease, background 350ms ease, transform 350ms ease;
+}
+
+.dot.dot-active {
+  background: var(--gold);
+  opacity: 0.85;
+  transform: scale(1.3);
+}
+
+/* ─── News screen ────────────────────────────────────────── */
+#news {
+  display: flex;
+  flex-direction: column;
+  background: var(--charcoal);
+  overflow: hidden;
+}
+
+.news-header {
+  flex-shrink: 0;
+  padding: 4vw 5vw 2vw;
+  background: linear-gradient(180deg, var(--charcoal) 65%, transparent);
+  z-index: 2;
+}
+
+.news-tabs {
+  display: flex;
+  gap: 2vw;
+  flex-wrap: wrap;
+}
+
+.news-tab {
+  background: rgba(44, 48, 32, 0.45);
+  border: 1px solid rgba(201, 168, 76, 0.18);
+  border-radius: 50px;
+  color: var(--text-dim);
+  font-size: clamp(12px, 2vw, 16px);
+  font-family: inherit;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  padding: 0.45em 1.3em;
+  min-height: 42px;
+  cursor: pointer;
+  transition: background 200ms ease, border-color 200ms ease, color 200ms ease;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.news-tab.active {
+  background: rgba(201, 168, 76, 0.15);
+  border-color: rgba(201, 168, 76, 0.5);
+  color: var(--gold);
+}
+
+.news-tab:active { transform: scale(0.95); }
+
+.news-updated {
+  font-size: clamp(10px, 1.4vw, 12px);
+  color: var(--text-dim);
+  opacity: 0.5;
+  letter-spacing: 0.05em;
+  margin-top: 0.6em;
+  padding-left: 0.2em;
+}
+
+.news-feed {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0.5vh 5vw 14vh;
+  scrollbar-width: thin;
+  scrollbar-color: var(--surface2) transparent;
+  -webkit-overflow-scrolling: touch;
+}
+
+.news-feed::-webkit-scrollbar { width: 4px; }
+.news-feed::-webkit-scrollbar-track { background: transparent; }
+.news-feed::-webkit-scrollbar-thumb { background: var(--surface2); border-radius: 2px; }
+
+.news-item {
+  padding: 2vh 0;
+  border-bottom: 1px solid rgba(201, 168, 76, 0.07);
+  animation: fadeUp 350ms ease both;
+}
+
+.news-item:last-child { border-bottom: none; }
+
+.news-item-title {
+  font-size: clamp(16px, 2.6vw, 24px);
+  font-weight: 400;
+  color: var(--text);
+  line-height: 1.4;
+  margin-bottom: 0.3em;
+}
+
+.news-item-time {
+  font-size: clamp(11px, 1.5vw, 13px);
+  color: var(--gold);
+  opacity: 0.7;
+  letter-spacing: 0.06em;
+}
+
+.news-loading,
+.news-error {
+  padding: 5vh 0;
+  text-align: center;
+  font-size: clamp(14px, 2.2vw, 18px);
+  color: var(--text-dim);
+  letter-spacing: 0.06em;
+}
+
+/* ─── Light theme — news overrides ──────────────────────── */
+[data-theme="light"] .news-tab {
+  background: var(--charcoal);
+  border: none;
+  box-shadow: 3px 3px 8px var(--neu-dark), -3px -3px 8px var(--neu-light);
+}
+
+[data-theme="light"] .news-tab.active {
+  background: var(--surface2);
+  box-shadow:
+    inset 2px 2px 5px var(--neu-inset-dark),
+    inset -2px -2px 5px var(--neu-inset-light);
+  color: var(--olive);
+  border: none;
+}
+
+[data-theme="light"] #news { background: var(--charcoal); }
+[data-theme="light"] .news-header {
+  background: linear-gradient(180deg, var(--charcoal) 65%, transparent);
 }
 
 /* ─── Landscape + large screens ─────────────────────────── */

@@ -13,25 +13,27 @@
 <body>
 
   <!-- ═══════════════════════════════════════════════
-       SCREENSAVER MODE
+       SAVER SCREEN 0 — Clock + Weather
   ════════════════════════════════════════════════ -->
   <div id="screensaver" class="screen active">
 
-    <!-- Organic background blobs (CSS animated, no canvas) -->
     <div class="bg-blob blob-1"></div>
     <div class="bg-blob blob-2"></div>
     <div class="bg-blob blob-3"></div>
 
+    <div class="saver-controls">
+      <button id="btn-lang-saver" class="saver-btn" aria-label="Switch language">BS</button>
+      <button id="btn-theme"      class="saver-btn" aria-label="Switch theme">☀️</button>
+    </div>
+
     <div class="screensaver-content">
 
-      <!-- Clock -->
       <div class="clock-block">
         <div id="clock-time" class="clock-time">00:00</div>
         <div id="clock-seconds" class="clock-seconds">00</div>
         <div id="clock-date" class="clock-date">Monday, January 1</div>
       </div>
 
-      <!-- Weather -->
       <div class="weather-block">
         <div class="weather-current">
           <span id="weather-icon" class="weather-icon">—</span>
@@ -42,9 +44,7 @@
           </div>
         </div>
 
-        <div id="weather-forecast" class="weather-forecast">
-          <!-- Populated by JS -->
-        </div>
+        <div id="weather-forecast" class="weather-forecast"></div>
 
         <div id="weather-error" class="weather-error hidden">
           Weather unavailable
@@ -53,8 +53,41 @@
 
     </div>
 
-    <!-- Tap hint fades out after first interaction -->
-    <div id="tap-hint" class="tap-hint">Tap to view shopping list</div>
+    <div id="tap-hint" class="tap-hint">Tap anywhere · Swipe for news</div>
+
+    <div class="saver-dots">
+      <div class="dot dot-active"></div>
+      <div class="dot"></div>
+    </div>
+
+  </div>
+
+  <!-- ═══════════════════════════════════════════════
+       SAVER SCREEN 1 — News Feed
+  ════════════════════════════════════════════════ -->
+  <div id="news" class="screen">
+
+    <div class="bg-blob blob-1"></div>
+    <div class="bg-blob blob-2"></div>
+    <div class="bg-blob blob-3"></div>
+
+    <div class="news-header">
+      <div id="news-tabs" class="news-tabs">
+        <button class="news-tab active" data-src="0">Klix.ba</button>
+        <button class="news-tab"        data-src="1">Oslobođenje</button>
+        <button class="news-tab"        data-src="2">Avaz</button>
+      </div>
+      <div id="news-updated" class="news-updated"></div>
+    </div>
+
+    <div id="news-feed" class="news-feed">
+      <div class="news-loading">Loading news…</div>
+    </div>
+
+    <div class="saver-dots">
+      <div class="dot"></div>
+      <div class="dot dot-active"></div>
+    </div>
 
   </div>
 
@@ -66,13 +99,13 @@
     <div class="shopping-header">
       <div class="shopping-title-row">
         <span class="shopping-icon">🛒</span>
-        <h1 class="shopping-title">Shopping List</h1>
+        <h1 id="shopping-title" class="shopping-title">Shopping List</h1>
+        <button id="btn-lang"        class="btn-header-icon" aria-label="Switch language">BS</button>
         <button id="btn-screensaver" class="btn-screensaver" aria-label="Return to screensaver">🌙</button>
       </div>
       <div id="shopping-meta" class="shopping-meta">Loading…</div>
     </div>
 
-    <!-- Inline add-item form (hidden until + is tapped) -->
     <div id="add-form" class="add-form hidden">
       <input id="add-input" class="add-input" type="text"
              placeholder="Add item…" autocomplete="off" autocorrect="off" autocapitalize="sentences" />
@@ -80,13 +113,11 @@
       <button id="btn-add-cancel"  class="btn-form-action btn-form-cancel"  aria-label="Cancel">✕</button>
     </div>
 
-    <div id="shopping-list" class="shopping-list">
-      <!-- Cards injected by JS -->
-    </div>
+    <div id="shopping-list" class="shopping-list"></div>
 
     <div id="shopping-empty" class="shopping-empty hidden">
       <div class="empty-icon">✓</div>
-      <div class="empty-text">All done!</div>
+      <div id="empty-text" class="empty-text">All done!</div>
     </div>
 
     <div id="shopping-error" class="shopping-error hidden">
@@ -94,10 +125,8 @@
       <div id="shopping-error-text" class="error-text">Could not load list</div>
     </div>
 
-    <!-- FAB: add item -->
     <button id="btn-add" class="btn-add" aria-label="Add item">+</button>
 
-    <!-- Selection action bar — slides up when items are selected -->
     <div id="selection-bar" class="selection-bar hidden">
       <button id="btn-cancel-sel" class="sel-btn sel-cancel">Cancel</button>
       <span   id="sel-count"      class="sel-count">0 selected</span>
@@ -105,7 +134,6 @@
       <button id="btn-clear-all"  class="sel-btn sel-danger">Clear All</button>
     </div>
 
-    <!-- Countdown bar (hidden while selection bar is active) -->
     <div id="return-bar" class="return-bar">
       <div id="return-bar-fill" class="return-bar-fill"></div>
     </div>
