@@ -879,38 +879,6 @@ html, body {
   gap: 2vw;
 }
 
-.news-tabs {
-  display: flex;
-  gap: 2vw;
-  flex-wrap: wrap;
-}
-
-.news-tab {
-  background: var(--charcoal);
-  border: none;
-  border-radius: 50px;
-  color: var(--text-dim);
-  font-size: clamp(12px, 2vw, 16px);
-  font-family: inherit;
-  font-weight: 500;
-  letter-spacing: 0.04em;
-  padding: 0.45em 1.3em;
-  min-height: 42px;
-  cursor: pointer;
-  box-shadow:
-    3px 3px 8px var(--neu-dark),
-    -3px -3px 8px var(--neu-light);
-  transition: box-shadow 200ms ease, color 200ms ease;
-}
-
-.news-tab.active {
-  box-shadow:
-    inset 2px 2px 6px var(--neu-inset-dark),
-    inset -2px -2px 6px var(--neu-inset-light);
-  color: var(--olive);
-}
-
-.news-tab:active { transform: scale(0.95); }
 
 .news-updated {
   font-size: clamp(10px, 1.4vw, 12px);
@@ -971,6 +939,14 @@ html, body {
 .saver-btn-cart {
   color: var(--gold);
   font-size: clamp(14px, 2.4vw, 18px);
+}
+
+/* Cart button pinned to top-right of screensaver */
+.saver-cart-top {
+  position: absolute;
+  top: 4vh;
+  right: 5vw;
+  z-index: 5;
 }
 
 /* ─── News article popup ────────────────────────────────── */

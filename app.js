@@ -46,11 +46,7 @@ const CONFIG = {
   news: {
     updateIntervalMs: 600_000,   // refresh every 10 minutes
     maxItems: 12,
-    sources: [
-      { label: 'Klix.ba',     rss: 'https://news.google.com/rss/search?q=site:klix.ba+-posao&hl=bs&gl=BA&ceid=BA:bs' },
-      { label: 'Oslobođenje', rss: 'https://news.google.com/rss/search?q=site:oslobodjenje.ba&hl=bs&gl=BA&ceid=BA:bs' },
-      { label: 'Avaz',        rss: 'https://news.google.com/rss/search?q=dnevni+avaz&hl=bs&gl=BA&ceid=BA:bs' },
-    ],
+    rss: 'https://www.klix.ba/rss',
   },
 
 };
@@ -269,7 +265,6 @@ const DOM = {
   tapHint:         document.getElementById('tap-hint'),
   // News
   newsFeed:        document.getElementById('news-feed'),
-  newsTabs:        document.getElementById('news-tabs'),
   newsUpdated:     document.getElementById('news-updated'),
   // Shopping list
   shoppingList:    document.getElementById('shopping-list'),
@@ -430,15 +425,12 @@ const Weather = (() => {
 const News = (() => {
   const cfg = CONFIG.news;
 
-  // CORS proxy chain — tried in order on failure.
-  // Sources are Google News RSS URLs so the proxies always get valid, reachable XML.
   const PROXIES = [
     url => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url),
     url => 'https://corsproxy.io/?' + encodeURIComponent(url),
   ];
 
-  let currentSrc = 0;
-  let cache = {};  // source index → articles array
+  let cache = null;
 
   // ─── Fetch helpers ────────────────────────────────────────
 
@@ -472,8 +464,6 @@ const News = (() => {
   }
 
   // ─── RSS XML parser ───────────────────────────────────────
-  // Google News RSS is standard RSS 2.0. Article titles include a
-  // " - Source Name" suffix that we strip for cleaner display.
 
   function parseRSS(xmlText) {
     const doc = new DOMParser().parseFromString(xmlText, 'application/xml');
@@ -483,9 +473,7 @@ const News = (() => {
     if (items.length === 0) throw new Error('Empty feed');
 
     return items.slice(0, cfg.maxItems).map(el => {
-      let title = el.querySelector('title')?.textContent?.trim() || '';
-      // Strip " - Source Name" suffix Google News appends
-      title = title.replace(/\s+-\s+[^-]+$/, '').trim();
+      const title = el.querySelector('title')?.textContent?.trim() || '';
 
       const pubDate    = el.querySelector('pubDate')?.textContent?.trim() || '';
       const link       = el.querySelector('link')?.textContent?.trim() || '';
@@ -545,58 +533,35 @@ const News = (() => {
     DOM.newsFeed.innerHTML = '<div class="news-error">' + escHtml(msg || 'Could not load news') + '</div>';
   }
 
-  // ─── Load a source (with cache) ──────────────────────────
+  // ─── Load feed (with cache) ──────────────────────────────
 
-  async function loadSource(idx, forceRefresh) {
-    if (!forceRefresh && cache[idx]) {
-      render(cache[idx]);
+  async function load(forceRefresh) {
+    if (!forceRefresh && cache) {
+      render(cache);
       return;
     }
 
     showLoading();
     try {
-      const articles = await fetchRSS(cfg.sources[idx].rss);
-      cache[idx] = articles;
-      if (currentSrc === idx) {
-        render(articles);
-        const now = new Date();
-        DOM.newsUpdated.textContent =
-          'Updated ' + now.getHours() + ':' + String(now.getMinutes()).padStart(2, '0');
-      }
+      const articles = await fetchRSS(cfg.rss);
+      cache = articles;
+      render(articles);
+      const now = new Date();
+      DOM.newsUpdated.textContent =
+        'Updated ' + now.getHours() + ':' + String(now.getMinutes()).padStart(2, '0');
     } catch (e) {
-      console.warn('[News] failed source', idx, e);
-      if (currentSrc === idx) showError('Could not load — check connection');
+      console.warn('[News] failed to load feed:', e);
+      showError('Could not load — check connection');
     }
   }
 
-  // ─── Switch active tab ───────────────────────────────────
-
-  function switchSource(idx) {
-    currentSrc = idx;
-    DOM.newsTabs.querySelectorAll('.news-tab').forEach((tab, i) => {
-      tab.classList.toggle('active', i === idx);
-    });
-    loadSource(idx);
-  }
-
-  // ─── Refresh all cached sources ──────────────────────────
-
   function refresh() {
-    cache = {};
-    loadSource(currentSrc, true);
+    cache = null;
+    load(true);
   }
-
-  // ─── Init ───────────────────────────────────────────────
 
   function init() {
-    DOM.newsTabs.querySelectorAll('.news-tab').forEach((tab, i) => {
-      tab.addEventListener('click', e => {
-        e.stopPropagation();
-        switchSource(i);
-      });
-    });
-
-    loadSource(0);
+    load();
     setInterval(refresh, cfg.updateIntervalMs);
   }
 
