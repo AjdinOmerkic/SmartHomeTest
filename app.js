@@ -1334,15 +1334,15 @@ const Flowers = (() => {
   const W         = window.innerWidth;
   const H         = window.innerHeight;
   const CYCLE_MS  = 30 * 60 * 1000;
-  const BASE_URL  = 'https://source.unsplash.com/featured/' + W + 'x' + H + '/?flowers,abstract,botanical';
+
+  // source.unsplash.com was shut down in 2023; use picsum.photos instead
+  function buildUrl() {
+    return 'https://picsum.photos/' + W + '/' + H + '?random=' + Date.now();
+  }
 
   let frontEl         = null;
   let cycleTimer      = null;
   let isTransitioning = false;
-
-  function buildUrl() {
-    return BASE_URL + '&sig=' + Math.random().toString(36).slice(2);
-  }
 
   function backEl() {
     return frontEl === DOM.flowersLayerA ? DOM.flowersLayerB : DOM.flowersLayerA;
