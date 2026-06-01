@@ -37,9 +37,9 @@ const CONFIG = {
   // 3. Set your location coordinates below.
   weather: {
     apiKey:    'YOUR_OPENWEATHER_API_KEY',
-    latitude:  '40.7128',    // replace with your latitude  (e.g. 51.5074 for London)
-    longitude: '-74.0060',   // replace with your longitude (e.g. -0.1278 for London)
-    units:     'metric',     // 'metric' (°C) | 'imperial' (°F)
+    latitude:  '44.53598540715475',   // Donji Mosnik, Tuzla, Bosnia
+    longitude: '18.66269391653291',
+    units:     'metric',              // °C
     updateIntervalMs: 600_000,  // refresh weather every 10 minutes
   },
 
