@@ -1622,6 +1622,31 @@ html, body {
   opacity: 0.65;
 }
 
+/* ─── Flowers screensaver ─────────────────────────────────── */
+#flowers {
+  overflow: hidden;
+  background: #000;
+}
+
+.flowers-layer {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  opacity: 0;
+  transition: opacity 1200ms ease-in-out;
+  will-change: opacity;
+}
+
+.flowers-vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at center, transparent 30%, rgba(0, 0, 0, 0.55) 100%);
+  pointer-events: none;
+  z-index: 3;
+}
+
 /* ─── Light theme overrides ─────────────────────────────── */
 /* The CSS variable system handles most of the palette swap;
    these overrides handle things that can't be done with vars. */

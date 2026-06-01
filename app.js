@@ -346,6 +346,10 @@ const DOM = {
   newsPopupTitle:    document.getElementById('news-popup-title'),
   newsPopupTime:     document.getElementById('news-popup-time'),
   newsPopupLink:     document.getElementById('news-popup-link'),
+  // Flowers screen
+  flowers:         document.getElementById('flowers'),
+  flowersLayerA:   document.getElementById('flowers-layer-a'),
+  flowersLayerB:   document.getElementById('flowers-layer-b'),
   // Climate screen
   climateTime:     document.getElementById('climate-time'),
   climateSecs:     document.getElementById('climate-secs'),
@@ -1320,6 +1324,101 @@ const Climate = (() => {
 })();
 
 /* ═══════════════════════════════════════════════════════════
+   MODULE: Flowers
+   Full-bleed Unsplash photo screensaver. Two layers crossfade
+   so there is never a flash of black between images.
+   Auto-cycles every 30 min; long-press anywhere skips early
+   and resets the 30-minute timer.
+═══════════════════════════════════════════════════════════ */
+const Flowers = (() => {
+  const W         = window.innerWidth;
+  const H         = window.innerHeight;
+  const CYCLE_MS  = 30 * 60 * 1000;
+  const BASE_URL  = 'https://source.unsplash.com/featured/' + W + 'x' + H + '/?flowers,abstract,botanical';
+
+  let frontEl         = null;
+  let cycleTimer      = null;
+  let isTransitioning = false;
+
+  function buildUrl() {
+    return BASE_URL + '&sig=' + Math.random().toString(36).slice(2);
+  }
+
+  function backEl() {
+    return frontEl === DOM.flowersLayerA ? DOM.flowersLayerB : DOM.flowersLayerA;
+  }
+
+  function loadNext() {
+    if (isTransitioning) return;
+    clearTimeout(cycleTimer);
+    isTransitioning = true;
+
+    const incoming = backEl();
+    const outgoing  = frontEl;
+    const url       = buildUrl();
+
+    incoming.style.backgroundImage = 'url(' + url + ')';
+
+    const img  = new Image();
+    img.onload = () => {
+      incoming.style.zIndex  = '1';
+      incoming.style.opacity = '1';
+      incoming.addEventListener('transitionend', function onEnd(e) {
+        if (e.propertyName !== 'opacity') return;
+        incoming.removeEventListener('transitionend', onEnd);
+        outgoing.style.zIndex = '0';
+        frontEl         = incoming;
+        isTransitioning = false;
+        cycleTimer = setTimeout(loadNext, CYCLE_MS);
+      });
+    };
+    img.onerror = () => {
+      isTransitioning = false;
+      cycleTimer = setTimeout(loadNext, CYCLE_MS);
+    };
+    img.src = url;
+  }
+
+  function addLongPress(el, cb) {
+    let timer = null;
+    function start() { timer = setTimeout(() => { timer = null; cb(); }, 500); }
+    function abort() { clearTimeout(timer); timer = null; }
+    el.addEventListener('touchstart',  start, { passive: true });
+    el.addEventListener('touchend',    abort, { passive: true });
+    el.addEventListener('touchmove',   abort, { passive: true });
+    el.addEventListener('mousedown',   start);
+    el.addEventListener('mouseup',     abort);
+    el.addEventListener('mouseleave',  abort);
+  }
+
+  function init() {
+    frontEl = DOM.flowersLayerA;
+
+    DOM.flowersLayerA.style.zIndex  = '1';
+    DOM.flowersLayerA.style.opacity = '0';
+    DOM.flowersLayerB.style.zIndex  = '0';
+    DOM.flowersLayerB.style.opacity = '0';
+
+    const url  = buildUrl();
+    DOM.flowersLayerA.style.backgroundImage = 'url(' + url + ')';
+
+    const img  = new Image();
+    img.onload = () => {
+      DOM.flowersLayerA.style.opacity = '1';
+      cycleTimer = setTimeout(loadNext, CYCLE_MS);
+    };
+    img.onerror = () => {
+      cycleTimer = setTimeout(loadNext, CYCLE_MS);
+    };
+    img.src = url;
+
+    addLongPress(DOM.flowers, loadNext);
+  }
+
+  return { init };
+})();
+
+/* ═══════════════════════════════════════════════════════════
    MODULE: Modes
    Three swipeable screens in order: 0=weather, 1=shopping, 2=news
    Swiping wraps circularly. The moon button returns to screen 0.
@@ -1327,8 +1426,8 @@ const Climate = (() => {
 const Modes = (() => {
   let saverIndex = 0;
 
-  // Screen order: weather → shopping → news → climate (circular)
-  const SAVER_ELS = () => [DOM.screensaver, DOM.shopping, DOM.news, DOM.climate];
+  // Screen order: weather → shopping → news → climate → flowers (circular)
+  const SAVER_ELS = () => [DOM.screensaver, DOM.shopping, DOM.news, DOM.climate, DOM.flowers];
 
   function updateDots(idx) {
     const n = SAVER_ELS().length;
@@ -1421,6 +1520,7 @@ const SwipeHandler = (() => {
   NewsPopup.init();
   ShoppingList.init();
   Climate.init();
+  Flowers.init();
   SwipeHandler.init();
   Modes.initButton();
 })();
