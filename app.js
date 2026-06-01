@@ -738,10 +738,11 @@ const QUICK_ITEMS = [
 const ShoppingList = (() => {
   const cfg = CONFIG.sheets;
 
-  let items    = [];
-  let selected = new Set();
-  let inSel    = false;
+  let items         = [];
+  let selected      = new Set();
+  let inSel         = false;
   let quickSelected = new Set();
+  let dirty         = false; // true when local state has unconfirmed writes
 
   function hasScript() {
     return cfg.scriptUrl && cfg.scriptUrl !== 'YOUR_APPS_SCRIPT_URL';
@@ -770,6 +771,17 @@ const ShoppingList = (() => {
     if (!res.ok) throw new Error('HTTP ' + res.status);
   }
 
+  async function syncToSheet() {
+    dirty = true;
+    try {
+      await sheetWrite('sync', { items: items.map(i => i.text) });
+      dirty = false;
+      await syncFromSheet();
+    } catch (err) {
+      throw err;
+    }
+  }
+
   async function addItem(text) {
     const t = text.trim();
     if (!t) return;
@@ -777,8 +789,7 @@ const ShoppingList = (() => {
     Storage.save(items);
     render();
     try {
-      await sheetWrite('add', { item: t });
-      await syncFromSheet();
+      await syncToSheet();
     } catch (err) {
       console.warn('[ShoppingList] add failed:', err.message);
     }
@@ -789,8 +800,7 @@ const ShoppingList = (() => {
     Storage.save(items);
     exitSelectionMode();
     try {
-      await sheetWrite('sync', { items: items.map(i => i.text) });
-      await syncFromSheet();
+      await syncToSheet();
     } catch (err) {
       console.warn('[ShoppingList] remove failed:', err.message);
     }
@@ -800,8 +810,10 @@ const ShoppingList = (() => {
     items = [];
     Storage.save(items);
     exitSelectionMode();
+    dirty = true;
     try {
       await sheetWrite('clear');
+      dirty = false;
       await syncFromSheet();
     } catch (err) {
       console.warn('[ShoppingList] clear failed:', err.message);
@@ -906,8 +918,7 @@ const ShoppingList = (() => {
     Storage.save(items);
     render();
     try {
-      for (const t of toAdd) await sheetWrite('add', { item: t });
-      await syncFromSheet();
+      await syncToSheet();
     } catch (err) {
       console.warn('[ShoppingList] batch add failed:', err.message);
     }
@@ -1017,6 +1028,7 @@ const ShoppingList = (() => {
   }
 
   async function seedFromCsv() {
+    if (dirty) return; // local changes not yet written — don't overwrite
     const { spreadsheetId, sheetName } = cfg;
     if (!spreadsheetId || spreadsheetId === 'YOUR_SPREADSHEET_ID') {
       DOM.shoppingMeta.textContent = 'Add Spreadsheet ID in config';
