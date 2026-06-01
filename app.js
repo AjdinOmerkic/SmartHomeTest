@@ -745,7 +745,7 @@ const ShoppingList = (() => {
   let dirty         = false; // true when local state has unconfirmed writes
 
   function hasScript() {
-    return cfg.scriptUrl && cfg.scriptUrl !== 'YOUR_APPS_SCRIPT_URL';
+    return cfg.scriptUrl && cfg.scriptUrl !== 'https://script.google.com/macros/s/AKfycbzAvTyvsy03JKqLs2j1ojCttBtrf9LADNz1NAstI-q-8xcGMwQMHhqxn0J_LSUsUW6l/exec';
   }
 
   async function sheetRead() {
@@ -757,7 +757,7 @@ const ShoppingList = (() => {
   }
 
   async function sheetWrite(action, params) {
-    if (!hasScript()) return;
+    if (!hasScript()) return false; // signal: write not attempted
     let url = cfg.scriptUrl + '?action=' + action;
     if (params) {
       Object.keys(params).forEach(k => {
@@ -769,17 +769,17 @@ const ShoppingList = (() => {
     }
     const res = await fetch(url);
     if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json().catch(() => ({}));
+    if (data.ok === false) throw new Error(data.error || 'Script error');
+    return true; // signal: write confirmed
   }
 
   async function syncToSheet() {
     dirty = true;
-    try {
-      await sheetWrite('sync', { items: items.map(i => i.text) });
-      dirty = false;
-      await syncFromSheet();
-    } catch (err) {
-      throw err;
-    }
+    const wrote = await sheetWrite('sync', { items: items.map(i => i.text) });
+    if (!wrote) return; // no script configured — keep dirty=true so seedFromCsv can't overwrite
+    dirty = false;
+    await syncFromSheet();
   }
 
   async function addItem(text) {
@@ -812,7 +812,8 @@ const ShoppingList = (() => {
     exitSelectionMode();
     dirty = true;
     try {
-      await sheetWrite('clear');
+      const wrote = await sheetWrite('clear');
+      if (!wrote) return; // no script — keep dirty=true
       dirty = false;
       await syncFromSheet();
     } catch (err) {
