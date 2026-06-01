@@ -14,7 +14,7 @@
  * Items live in column A from row 2 downward.
  */
 
-const SHEET_NAME = 'Sheet1';
+const SHEET_NAME = 'ShoppingList';
 
 function doGet(e) {
   try {

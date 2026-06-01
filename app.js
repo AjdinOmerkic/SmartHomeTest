@@ -24,7 +24,7 @@ const CONFIG = {
   /* ── Google Sheets (no API key required) ───────────── */
   sheets: {
     spreadsheetId: '1m9IoejCF9aqKx5yWTKRQXkWQt-pH00ZcCimQ-KrHcNg',
-    sheetName:     'Sheet1',
+    sheetName:     'ShoppingList',
     scriptUrl:     'https://script.google.com/macros/s/AKfycbzAvTyvsy03JKqLs2j1ojCttBtrf9LADNz1NAstI-q-8xcGMwQMHhqxn0J_LSUsUW6l/exec',
   },
 
