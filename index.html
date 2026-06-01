@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#1a1c14" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>Smart Home</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <!-- ═══════════════════════════════════════════════
+       SCREENSAVER MODE
+  ════════════════════════════════════════════════ -->
+  <div id="screensaver" class="screen active">
+
+    <!-- Organic background blobs (CSS animated, no canvas) -->
+    <div class="bg-blob blob-1"></div>
+    <div class="bg-blob blob-2"></div>
+    <div class="bg-blob blob-3"></div>
+
+    <div class="screensaver-content">
+
+      <!-- Clock -->
+      <div class="clock-block">
+        <div id="clock-time" class="clock-time">00:00</div>
+        <div id="clock-seconds" class="clock-seconds">00</div>
+        <div id="clock-date" class="clock-date">Monday, January 1</div>
+      </div>
+
+      <!-- Weather -->
+      <div class="weather-block">
+        <div class="weather-current">
+          <span id="weather-icon" class="weather-icon">—</span>
+          <div class="weather-temp-block">
+            <span id="weather-temp" class="weather-temp">--°</span>
+            <span id="weather-desc" class="weather-desc">Loading…</span>
+            <span id="weather-hilo" class="weather-hilo">H: --° · L: --°</span>
+          </div>
+        </div>
+
+        <div id="weather-forecast" class="weather-forecast">
+          <!-- Populated by JS -->
+        </div>
+
+        <div id="weather-error" class="weather-error hidden">
+          Weather unavailable
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Tap hint fades out after first interaction -->
+    <div id="tap-hint" class="tap-hint">Tap to view shopping list</div>
+
+  </div>
+
+  <!-- ═══════════════════════════════════════════════
+       SHOPPING LIST MODE
+  ════════════════════════════════════════════════ -->
+  <div id="shopping" class="screen">
+
+    <div class="shopping-header">
+      <div class="shopping-title-row">
+        <span class="shopping-icon">🛒</span>
+        <h1 class="shopping-title">Shopping List</h1>
+      </div>
+      <div id="shopping-meta" class="shopping-meta">Loading…</div>
+    </div>
+
+    <div id="shopping-list" class="shopping-list">
+      <!-- Cards injected by JS -->
+    </div>
+
+    <div id="shopping-empty" class="shopping-empty hidden">
+      <div class="empty-icon">✓</div>
+      <div class="empty-text">All done!</div>
+    </div>
+
+    <div id="shopping-error" class="shopping-error hidden">
+      <div class="error-icon">!</div>
+      <div id="shopping-error-text" class="error-text">Could not load list</div>
+    </div>
+
+    <!-- Subtle countdown bar so users know when screensaver returns -->
+    <div id="return-bar" class="return-bar">
+      <div id="return-bar-fill" class="return-bar-fill"></div>
+    </div>
+
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

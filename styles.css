@@ -1,0 +1,538 @@
+/* ═══════════════════════════════════════════════════════════
+   SMART HOME DASHBOARD — styles.css
+   Color palette:
+     --charcoal   #1a1c14   (background)
+     --surface    #23261a   (card surface)
+     --surface2   #2c3020   (elevated surface)
+     --olive      #7c8a3a   (primary)
+     --forest     #3d4f1e   (secondary)
+     --gold       #c9a84c   (accent)
+     --text       #e8e4d4   (primary text)
+     --text-dim   #9e9c8a   (secondary text)
+═══════════════════════════════════════════════════════════ */
+
+/* ─── Reset & base ─────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+:root {
+  --charcoal:   #1a1c14;
+  --surface:    #23261a;
+  --surface2:   #2c3020;
+  --olive:      #7c8a3a;
+  --forest:     #3d4f1e;
+  --gold:       #c9a84c;
+  --gold-dim:   #8a6e2a;
+  --text:       #e8e4d4;
+  --text-dim:   #9e9c8a;
+  --danger:     #c0392b;
+  --radius:     18px;
+  --transition: 600ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--charcoal);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* ─── Screen containers ─────────────────────────────────── */
+.screen {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition);
+  will-change: opacity;
+}
+
+.screen.active {
+  opacity: 1;
+  pointer-events: all;
+}
+
+/* ─── Background organic blobs ──────────────────────────── */
+.bg-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.18;
+  will-change: transform;
+  pointer-events: none;
+}
+
+.blob-1 {
+  width: 55vw;
+  height: 55vw;
+  background: radial-gradient(circle, var(--forest), transparent 70%);
+  top: -15vw;
+  left: -10vw;
+  animation: blobDrift1 22s ease-in-out infinite alternate;
+}
+
+.blob-2 {
+  width: 45vw;
+  height: 45vw;
+  background: radial-gradient(circle, var(--olive), transparent 70%);
+  bottom: -10vw;
+  right: -5vw;
+  animation: blobDrift2 28s ease-in-out infinite alternate;
+}
+
+.blob-3 {
+  width: 30vw;
+  height: 30vw;
+  background: radial-gradient(circle, var(--gold-dim), transparent 70%);
+  top: 40%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  animation: blobDrift3 18s ease-in-out infinite alternate;
+}
+
+@keyframes blobDrift1 {
+  from { transform: translate(0, 0) scale(1);   }
+  to   { transform: translate(6vw, 8vw) scale(1.08); }
+}
+@keyframes blobDrift2 {
+  from { transform: translate(0, 0) scale(1.05); }
+  to   { transform: translate(-4vw, -6vw) scale(0.95); }
+}
+@keyframes blobDrift3 {
+  from { transform: translate(-50%, -50%) scale(1);   }
+  to   { transform: translate(-50%, -50%) scale(1.15); }
+}
+
+/* ─── Screensaver layout ────────────────────────────────── */
+#screensaver {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--charcoal);
+}
+
+.screensaver-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6vh;
+  padding: 4vw;
+  z-index: 1;
+  width: 100%;
+  max-width: 900px;
+}
+
+/* ─── Clock ─────────────────────────────────────────────── */
+.clock-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1;
+}
+
+.clock-time {
+  font-size: clamp(72px, 18vw, 180px);
+  font-weight: 200;
+  letter-spacing: -0.03em;
+  color: var(--text);
+  /* Tabular nums prevents width jitter as digits change */
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+  text-shadow: 0 0 60px rgba(201, 168, 76, 0.15);
+  line-height: 1;
+}
+
+.clock-seconds {
+  font-size: clamp(18px, 3.5vw, 36px);
+  font-weight: 300;
+  color: var(--gold);
+  letter-spacing: 0.15em;
+  margin-top: 0.2em;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+.clock-date {
+  font-size: clamp(14px, 2.5vw, 26px);
+  font-weight: 300;
+  color: var(--text-dim);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-top: 0.8em;
+}
+
+/* ─── Weather ────────────────────────────────────────────── */
+.weather-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2.5vh;
+  width: 100%;
+}
+
+.weather-current {
+  display: flex;
+  align-items: center;
+  gap: 3vw;
+  background: rgba(44, 48, 32, 0.45);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(201, 168, 76, 0.12);
+  border-radius: var(--radius);
+  padding: 2.5vh 4vw;
+}
+
+.weather-icon {
+  font-size: clamp(36px, 8vw, 72px);
+  line-height: 1;
+}
+
+.weather-temp-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3em;
+}
+
+.weather-temp {
+  font-size: clamp(36px, 7vw, 64px);
+  font-weight: 200;
+  color: var(--text);
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+  line-height: 1;
+}
+
+.weather-desc {
+  font-size: clamp(13px, 2.2vw, 20px);
+  font-weight: 400;
+  color: var(--text-dim);
+  text-transform: capitalize;
+}
+
+.weather-hilo {
+  font-size: clamp(11px, 1.8vw, 16px);
+  color: var(--gold);
+  letter-spacing: 0.05em;
+}
+
+/* Forecast strip */
+.weather-forecast {
+  display: flex;
+  gap: 2vw;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.forecast-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4em;
+  background: rgba(44, 48, 32, 0.35);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(201, 168, 76, 0.08);
+  border-radius: 12px;
+  padding: 1.2vh 2.5vw;
+  min-width: 70px;
+  animation: fadeUp 400ms ease both;
+}
+
+.forecast-day-name {
+  font-size: clamp(10px, 1.6vw, 14px);
+  font-weight: 500;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.forecast-icon {
+  font-size: clamp(20px, 4vw, 32px);
+}
+
+.forecast-high {
+  font-size: clamp(13px, 2vw, 18px);
+  font-weight: 500;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+.forecast-low {
+  font-size: clamp(10px, 1.6vw, 14px);
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+.weather-error {
+  font-size: clamp(11px, 1.8vw, 16px);
+  color: var(--text-dim);
+  letter-spacing: 0.05em;
+}
+
+/* ─── Tap hint ───────────────────────────────────────────── */
+.tap-hint {
+  position: absolute;
+  bottom: 4vh;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: clamp(11px, 1.8vw, 14px);
+  color: var(--text-dim);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  opacity: 0.6;
+  animation: pulseHint 3s ease-in-out infinite;
+  z-index: 2;
+  white-space: nowrap;
+}
+
+@keyframes pulseHint {
+  0%, 100% { opacity: 0.4; }
+  50%       { opacity: 0.8; }
+}
+
+.tap-hint.hidden { display: none; }
+
+/* ─── Shopping list layout ──────────────────────────────── */
+#shopping {
+  display: flex;
+  flex-direction: column;
+  background: var(--charcoal);
+  overflow: hidden;
+}
+
+.shopping-header {
+  flex-shrink: 0;
+  padding: 4vw 5vw 2vw;
+  background: linear-gradient(180deg, var(--charcoal) 60%, transparent);
+  z-index: 2;
+}
+
+.shopping-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+}
+
+.shopping-icon {
+  font-size: clamp(22px, 5vw, 40px);
+}
+
+.shopping-title {
+  font-size: clamp(22px, 5vw, 40px);
+  font-weight: 300;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+.shopping-meta {
+  font-size: clamp(11px, 1.8vw, 15px);
+  color: var(--text-dim);
+  margin-top: 0.4em;
+  letter-spacing: 0.04em;
+}
+
+/* Scrollable card area */
+.shopping-list {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 2vh 5vw 12vh;
+  /* Custom scrollbar — minimal */
+  scrollbar-width: thin;
+  scrollbar-color: var(--surface2) transparent;
+  -webkit-overflow-scrolling: touch;
+}
+
+.shopping-list::-webkit-scrollbar { width: 4px; }
+.shopping-list::-webkit-scrollbar-track { background: transparent; }
+.shopping-list::-webkit-scrollbar-thumb {
+  background: var(--surface2);
+  border-radius: 2px;
+}
+
+/* ─── Shopping card ─────────────────────────────────────── */
+.card {
+  display: flex;
+  align-items: center;
+  gap: 3.5vw;
+  background: rgba(35, 38, 26, 0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(124, 138, 58, 0.15);
+  border-radius: var(--radius);
+  padding: 4vw 5vw;
+  margin-bottom: 2.5vw;
+  min-height: 72px;
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  animation: cardEntrance 350ms cubic-bezier(0.34, 1.36, 0.64, 1) both;
+  cursor: default;
+  /* Prevent layout thrash during scroll */
+  contain: layout style;
+}
+
+/* Stagger cards */
+.card:nth-child(1)  { animation-delay: 30ms;  }
+.card:nth-child(2)  { animation-delay: 60ms;  }
+.card:nth-child(3)  { animation-delay: 90ms;  }
+.card:nth-child(4)  { animation-delay: 120ms; }
+.card:nth-child(5)  { animation-delay: 150ms; }
+.card:nth-child(6)  { animation-delay: 180ms; }
+.card:nth-child(7)  { animation-delay: 210ms; }
+.card:nth-child(8)  { animation-delay: 240ms; }
+.card:nth-child(9)  { animation-delay: 270ms; }
+.card:nth-child(10) { animation-delay: 300ms; }
+
+.card:active {
+  background: rgba(44, 48, 32, 0.8);
+  border-color: rgba(201, 168, 76, 0.3);
+  transform: scale(0.98);
+  transition: transform 100ms ease, background 100ms ease, border-color 100ms ease;
+}
+
+@keyframes cardEntrance {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.card-bullet {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--gold);
+  flex-shrink: 0;
+  opacity: 0.7;
+  box-shadow: 0 0 8px rgba(201, 168, 76, 0.4);
+}
+
+.card-text {
+  font-size: clamp(16px, 3.5vw, 28px);
+  font-weight: 400;
+  color: var(--text);
+  letter-spacing: 0.01em;
+  flex: 1;
+  line-height: 1.3;
+}
+
+/* ─── Empty / Error states ──────────────────────────────── */
+.shopping-empty,
+.shopping-error {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5vh;
+  pointer-events: none;
+}
+
+.empty-icon {
+  font-size: clamp(40px, 10vw, 80px);
+  color: var(--gold);
+  opacity: 0.6;
+}
+
+.empty-text,
+.error-text {
+  font-size: clamp(14px, 2.5vw, 20px);
+  color: var(--text-dim);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.error-icon {
+  font-size: clamp(36px, 9vw, 72px);
+  color: var(--danger);
+  opacity: 0.5;
+  font-weight: 700;
+  font-style: italic;
+}
+
+/* ─── Return countdown bar ──────────────────────────────── */
+.return-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.05);
+  z-index: 10;
+  overflow: hidden;
+}
+
+.return-bar-fill {
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(90deg, var(--forest), var(--gold));
+  transform-origin: left;
+  transform: scaleX(1);
+  transition: transform 1s linear;
+  will-change: transform;
+}
+
+/* ─── Utility ────────────────────────────────────────────── */
+.hidden { display: none !important; }
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── Landscape + large screens ─────────────────────────── */
+@media (orientation: landscape) and (min-width: 600px) {
+  .screensaver-content {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-around;
+    gap: 4vw;
+    max-width: 100%;
+    padding: 5vh 6vw;
+  }
+
+  .clock-block {
+    align-items: flex-start;
+  }
+
+  .weather-block {
+    align-items: flex-start;
+    max-width: 50%;
+  }
+
+  .weather-current {
+    gap: 2.5vw;
+    padding: 2vh 3vw;
+  }
+
+  .tap-hint { bottom: 3vh; }
+}
+
+/* ─── Reduce motion for accessibility / battery ─────────── */
+@media (prefers-reduced-motion: reduce) {
+  .bg-blob { animation: none; }
+  .tap-hint { animation: none; opacity: 0.5; }
+  .card { animation: none; }
+  .forecast-day { animation: none; }
+}
