@@ -67,8 +67,17 @@
       <div class="shopping-title-row">
         <span class="shopping-icon">🛒</span>
         <h1 class="shopping-title">Shopping List</h1>
+        <button id="btn-screensaver" class="btn-screensaver" aria-label="Return to screensaver">🌙</button>
       </div>
       <div id="shopping-meta" class="shopping-meta">Loading…</div>
+    </div>
+
+    <!-- Inline add-item form (hidden until + is tapped) -->
+    <div id="add-form" class="add-form hidden">
+      <input id="add-input" class="add-input" type="text"
+             placeholder="Add item…" autocomplete="off" autocorrect="off" autocapitalize="sentences" />
+      <button id="btn-add-confirm" class="btn-form-action btn-form-confirm" aria-label="Add">✓</button>
+      <button id="btn-add-cancel"  class="btn-form-action btn-form-cancel"  aria-label="Cancel">✕</button>
     </div>
 
     <div id="shopping-list" class="shopping-list">
@@ -85,7 +94,18 @@
       <div id="shopping-error-text" class="error-text">Could not load list</div>
     </div>
 
-    <!-- Subtle countdown bar so users know when screensaver returns -->
+    <!-- FAB: add item -->
+    <button id="btn-add" class="btn-add" aria-label="Add item">+</button>
+
+    <!-- Selection action bar — slides up when items are selected -->
+    <div id="selection-bar" class="selection-bar hidden">
+      <button id="btn-cancel-sel" class="sel-btn sel-cancel">Cancel</button>
+      <span   id="sel-count"      class="sel-count">0 selected</span>
+      <button id="btn-delete-sel" class="sel-btn sel-delete" disabled>Delete</button>
+      <button id="btn-clear-all"  class="sel-btn sel-danger">Clear All</button>
+    </div>
+
+    <!-- Countdown bar (hidden while selection bar is active) -->
     <div id="return-bar" class="return-bar">
       <div id="return-bar-fill" class="return-bar-fill"></div>
     </div>

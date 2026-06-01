@@ -3,9 +3,12 @@
  *
  * Architecture:
  *   Config       — all user-editable values in one place
+ *   uid()        — unique ID generator
+ *   Storage      — localStorage persistence for shopping list
  *   Clock        — updates time/date every second
  *   Weather      — fetches OpenWeatherMap, updates every 10 min
- *   ShoppingList — fetches Google Sheets, updates every 5 min
+ *   ShoppingList — localStorage-backed list; seeds from Google Sheets on first load
+ *                  supports add, long-press-select, delete selected, clear all
  *   Modes        — controls SCREENSAVER ↔ SHOPPING transitions
  *   Inactivity   — detects user interaction, drives mode switching
  */
@@ -36,7 +39,7 @@ const CONFIG = {
   // 2. Generate an API key.
   // 3. Set your location coordinates below.
   weather: {
-    apiKey:    'YOUR_OPENWEATHER_API_KEY',
+    apiKey:    '2128a3acf79c2a2080a85974224acf4c',
     latitude:  '44.53598540715475',   // Donji Mosnik, Tuzla, Bosnia
     longitude: '18.66269391653291',
     units:     'metric',              // °C
@@ -81,14 +84,46 @@ function getWeatherIcon(code) {
 }
 
 /* ═══════════════════════════════════════════════════════════
+   HELPERS
+═══════════════════════════════════════════════════════════ */
+
+// Short unique ID — used to tag shopping list items
+function uid() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   MODULE: Storage
+   Persists the shopping list to localStorage as JSON.
+═══════════════════════════════════════════════════════════ */
+const Storage = (() => {
+  const KEY = 'shl_v1';
+
+  function load() {
+    try { return JSON.parse(localStorage.getItem(KEY)); }
+    catch { return null; }
+  }
+
+  function save(items) {
+    try { localStorage.setItem(KEY, JSON.stringify(items)); }
+    catch (e) { console.warn('[Storage]', e.message); }
+  }
+
+  return { load, save };
+})();
+
+/* ═══════════════════════════════════════════════════════════
    DOM REFERENCES — cached once at startup
 ═══════════════════════════════════════════════════════════ */
 const DOM = {
+  // Screens
   screensaver:     document.getElementById('screensaver'),
   shopping:        document.getElementById('shopping'),
+  // Clock
   clockTime:       document.getElementById('clock-time'),
   clockSeconds:    document.getElementById('clock-seconds'),
   clockDate:       document.getElementById('clock-date'),
+  // Weather
   weatherIcon:     document.getElementById('weather-icon'),
   weatherTemp:     document.getElementById('weather-temp'),
   weatherDesc:     document.getElementById('weather-desc'),
@@ -96,12 +131,29 @@ const DOM = {
   weatherForecast: document.getElementById('weather-forecast'),
   weatherError:    document.getElementById('weather-error'),
   tapHint:         document.getElementById('tap-hint'),
+  // Shopping list
   shoppingList:    document.getElementById('shopping-list'),
   shoppingMeta:    document.getElementById('shopping-meta'),
   shoppingEmpty:   document.getElementById('shopping-empty'),
   shoppingError:   document.getElementById('shopping-error'),
   shoppingErrTxt:  document.getElementById('shopping-error-text'),
+  // Add form
+  addForm:         document.getElementById('add-form'),
+  addInput:        document.getElementById('add-input'),
+  btnAdd:          document.getElementById('btn-add'),
+  btnAddConfirm:   document.getElementById('btn-add-confirm'),
+  btnAddCancel:    document.getElementById('btn-add-cancel'),
+  // Selection bar
+  selectionBar:    document.getElementById('selection-bar'),
+  selCount:        document.getElementById('sel-count'),
+  btnDeleteSel:    document.getElementById('btn-delete-sel'),
+  btnCancelSel:    document.getElementById('btn-cancel-sel'),
+  btnClearAll:     document.getElementById('btn-clear-all'),
+  // Return countdown bar
+  returnBar:       document.getElementById('return-bar'),
   returnBarFill:   document.getElementById('return-bar-fill'),
+  // Nav
+  btnScreensaver:  document.getElementById('btn-screensaver'),
 };
 
 /* ═══════════════════════════════════════════════════════════
@@ -271,79 +323,140 @@ const Weather = (() => {
 
 /* ═══════════════════════════════════════════════════════════
    MODULE: ShoppingList
-   Uses the Google Sheets CSV export — no API key required.
-   The sheet must be either:
-     • Published to web  (File → Share → Publish to web → CSV), OR
-     • Shared as "Anyone with the link can view"
+   Source of truth: localStorage (key "shl_v1").
+   On first ever load (empty storage) it seeds from Google Sheets.
+   Supports: add item, long-press → select, delete selected, clear all.
 ═══════════════════════════════════════════════════════════ */
 const ShoppingList = (() => {
-  const cfg      = CONFIG.sheets;
-  let   lastHash = '';   // avoid re-rendering identical lists
+  const cfg = CONFIG.sheets;
 
-  // djb2 hash — fast, no crypto needed
-  function simpleHash(str) {
-    let h = 5381;
-    for (let i = 0; i < str.length; i++) {
-      h = (h * 33) ^ str.charCodeAt(i);
-    }
-    return h >>> 0;
+  let items    = [];        // [{ id: string, text: string }, ...]
+  let selected = new Set(); // IDs of currently selected items
+  let inSel    = false;     // whether selection mode is active
+
+  // ─── Item operations ────────────────────────────────────
+
+  function addItem(text) {
+    const t = text.trim();
+    if (!t) return;
+    items.unshift({ id: uid(), text: t });
+    Storage.save(items);
+    render();
   }
 
-  // Parse a raw CSV string into an array of non-empty strings.
-  // Handles quoted fields and strips the header row.
-  function parseCsv(raw) {
-    const lines = raw.split('\n');
-    const items = [];
-    // Skip row 0 (the "Item" header)
-    for (let i = 1; i < lines.length; i++) {
-      // Strip surrounding quotes and whitespace
-      const cell = lines[i].replace(/^"(.*)"$/, '$1').trim();
-      if (cell) items.push(cell);
-    }
-    return items;
+  function removeSelected() {
+    items = items.filter(item => !selected.has(item.id));
+    Storage.save(items);
+    exitSelectionMode(); // also calls render()
   }
 
-  function showError(msg) {
-    DOM.shoppingError.classList.remove('hidden');
-    DOM.shoppingErrTxt.textContent = msg || 'Could not load list';
-    DOM.shoppingList.innerHTML = '';
-    DOM.shoppingEmpty.classList.add('hidden');
-    DOM.shoppingMeta.textContent = 'Failed to load';
+  function clearAll() {
+    items = [];
+    Storage.save(items);
+    exitSelectionMode(); // also calls render()
   }
 
-  function render(items) {
-    const hash = '' + simpleHash(items.join('|'));
-    if (hash === lastHash) return;   // data unchanged, skip re-render
-    lastHash = hash;
+  // ─── Selection mode ─────────────────────────────────────
+
+  function enterSelectionMode(firstId) {
+    inSel = true;
+    selected.clear();
+    selected.add(firstId);
+    // Show selection bar, hide countdown bar
+    DOM.selectionBar.classList.remove('hidden');
+    DOM.returnBar.classList.add('hidden');
+    render();
+    updateSelBar();
+  }
+
+  function exitSelectionMode() {
+    inSel = false;
+    selected.clear();
+    DOM.selectionBar.classList.add('hidden');
+    DOM.returnBar.classList.remove('hidden');
+    render();
+  }
+
+  function toggleSelect(id) {
+    if (selected.has(id)) { selected.delete(id); }
+    else                  { selected.add(id);    }
+    // Update just this one card — avoids full re-render during selection
+    const card = DOM.shoppingList.querySelector('[data-id="' + id + '"]');
+    if (card) card.classList.toggle('selected', selected.has(id));
+    updateSelBar();
+  }
+
+  function updateSelBar() {
+    const n = selected.size;
+    DOM.selCount.textContent   = n + ' selected';
+    DOM.btnDeleteSel.textContent = n > 0 ? 'Delete (' + n + ')' : 'Delete';
+    DOM.btnDeleteSel.disabled  = (n === 0);
+  }
+
+  // ─── Long press detection ────────────────────────────────
+
+  function addLongPress(el, cb) {
+    let timer = null;
+    function start() { timer = setTimeout(() => { timer = null; cb(); }, 500); }
+    function abort() { clearTimeout(timer); timer = null; }
+    el.addEventListener('touchstart',  start, { passive: true });
+    el.addEventListener('touchend',    abort, { passive: true });
+    el.addEventListener('touchmove',   abort, { passive: true });
+    el.addEventListener('mousedown',   start);
+    el.addEventListener('mouseup',     abort);
+    el.addEventListener('mouseleave',  abort);
+  }
+
+  // ─── Rendering ──────────────────────────────────────────
+
+  function render() {
+    DOM.shoppingError.classList.add('hidden');
 
     if (items.length === 0) {
       DOM.shoppingList.innerHTML = '';
       DOM.shoppingEmpty.classList.remove('hidden');
-      DOM.shoppingError.classList.add('hidden');
       DOM.shoppingMeta.textContent = 'List is empty';
       return;
     }
 
     DOM.shoppingEmpty.classList.add('hidden');
-    DOM.shoppingError.classList.add('hidden');
-    DOM.shoppingMeta.textContent = items.length + ' item' + (items.length !== 1 ? 's' : '');
+    DOM.shoppingMeta.textContent =
+      items.length + ' item' + (items.length !== 1 ? 's' : '');
 
-    // Build all card nodes in a DocumentFragment — one DOM insertion
     const frag = document.createDocumentFragment();
 
-    items.forEach(name => {
-      const card   = document.createElement('div');
-      card.className = 'card';
+    items.forEach((item, idx) => {
+      const card = document.createElement('div');
+      card.className = 'card' + (selected.has(item.id) ? ' selected' : '');
+      card.dataset.id = item.id;
+      // Stagger entrance animation only on fresh renders, not selection toggles
+      card.style.animationDelay = inSel ? '0ms' : Math.min(idx * 30, 270) + 'ms';
 
       const bullet = document.createElement('div');
       bullet.className = 'card-bullet';
 
-      const text   = document.createElement('div');
-      text.className = 'card-text';
-      text.textContent = name;   // textContent is XSS-safe
+      const text = document.createElement('div');
+      text.className   = 'card-text';
+      text.textContent = item.text;   // textContent — XSS safe
+
+      const check = document.createElement('div');
+      check.className   = 'card-check';
+      check.textContent = '✓';
 
       card.appendChild(bullet);
       card.appendChild(text);
+      card.appendChild(check);
+
+      // Long press → enter selection (only when not already in selection mode)
+      addLongPress(card, () => {
+        if (!inSel) enterSelectionMode(item.id);
+      });
+
+      // Tap → toggle if already selecting
+      card.addEventListener('click', () => {
+        if (inSel) toggleSelect(item.id);
+      });
+
       frag.appendChild(card);
     });
 
@@ -351,44 +464,109 @@ const ShoppingList = (() => {
     DOM.shoppingList.appendChild(frag);
   }
 
-  async function fetchList() {
-    const { spreadsheetId, sheetName } = cfg;
+  // ─── Add form ───────────────────────────────────────────
 
+  function showAddForm() {
+    DOM.addForm.classList.remove('hidden');
+    DOM.btnAdd.style.visibility = 'hidden';
+    DOM.addInput.value = '';
+    setTimeout(() => DOM.addInput.focus(), 60); // let animation finish first
+  }
+
+  function hideAddForm() {
+    DOM.addForm.classList.add('hidden');
+    DOM.btnAdd.style.visibility = '';
+    DOM.addInput.blur();
+  }
+
+  function confirmAdd() {
+    const t = DOM.addInput.value.trim();
+    if (t) addItem(t);
+    hideAddForm();
+  }
+
+  // ─── Google Sheets seed (first load only) ───────────────
+
+  function parseCsv(raw) {
+    const lines = raw.split('\n');
+    const out   = [];
+    for (let i = 1; i < lines.length; i++) {
+      const cell = lines[i].replace(/^"(.*)"$/, '$1').trim();
+      if (cell) out.push({ id: uid(), text: cell });
+    }
+    return out;
+  }
+
+  async function seedFromSheets() {
+    const { spreadsheetId, sheetName } = cfg;
     if (!spreadsheetId || spreadsheetId === 'YOUR_SPREADSHEET_ID') {
-      showError('Add Spreadsheet ID in config');
+      DOM.shoppingMeta.textContent = 'Add Spreadsheet ID in config';
       return;
     }
-
     try {
-      // gviz/tq endpoint: works with public sheets and "anyone with link" shares.
-      // Returns CSV with no auth required.
       const url =
-        'https://docs.google.com/spreadsheets/d/' +
-        spreadsheetId +
-        '/gviz/tq?tqx=out:csv&sheet=' +
-        encodeURIComponent(sheetName);
-
+        'https://docs.google.com/spreadsheets/d/' + spreadsheetId +
+        '/gviz/tq?tqx=out:csv&sheet=' + encodeURIComponent(sheetName);
       const res = await fetch(url);
-
       if (!res.ok) throw new Error('HTTP ' + res.status);
-
-      const csv   = await res.text();
-      const items = parseCsv(csv);
-      render(items);
-
+      const csv = await res.text();
+      items = parseCsv(csv);
+      Storage.save(items);
+      render();
     } catch (err) {
-      console.warn('[ShoppingList] fetch failed:', err.message);
-      showError('Check sharing settings or Spreadsheet ID');
+      console.warn('[ShoppingList] seed failed:', err.message);
+      DOM.shoppingError.classList.remove('hidden');
+      DOM.shoppingErrTxt.textContent = 'Check sharing settings or Spreadsheet ID';
+      DOM.shoppingMeta.textContent   = 'Failed to load';
     }
   }
 
+  // ─── Init ───────────────────────────────────────────────
+
   function init() {
-    fetchList();
-    setInterval(fetchList, CONFIG.shopping.updateIntervalMs);
+    // Use localStorage if it has data; otherwise pull from Google Sheets
+    const stored = Storage.load();
+    if (stored && Array.isArray(stored) && stored.length > 0) {
+      // Migrate old format (plain strings → objects) if needed
+      items = stored.map(item =>
+        typeof item === 'string' ? { id: uid(), text: item } : item
+      );
+      render();
+    } else {
+      seedFromSheets();
+    }
+
+    // Add form
+    DOM.btnAdd.addEventListener('click', e => { e.stopPropagation(); showAddForm(); });
+    DOM.btnAddConfirm.addEventListener('click', e => { e.stopPropagation(); confirmAdd(); });
+    DOM.btnAddCancel.addEventListener('click',  e => { e.stopPropagation(); hideAddForm(); });
+    DOM.addInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter')  { e.preventDefault(); confirmAdd(); }
+      if (e.key === 'Escape') { hideAddForm(); }
+    });
+
+    // Selection bar
+    DOM.btnCancelSel.addEventListener('click', e => { e.stopPropagation(); exitSelectionMode(); });
+    DOM.btnDeleteSel.addEventListener('click', e => { e.stopPropagation(); removeSelected(); });
+    DOM.btnClearAll.addEventListener('click', e => {
+      e.stopPropagation();
+      // Two-tap confirmation: tap once → "Sure?", tap again → clear
+      if (DOM.btnClearAll.dataset.confirm === '1') {
+        clearAll();
+      } else {
+        DOM.btnClearAll.dataset.confirm = '1';
+        DOM.btnClearAll.textContent = 'Sure?';
+        setTimeout(() => {
+          if (DOM.btnClearAll.dataset.confirm === '1') {
+            DOM.btnClearAll.dataset.confirm = '0';
+            DOM.btnClearAll.textContent = 'Clear All';
+          }
+        }, 2500);
+      }
+    });
   }
 
-  // Exposed so Modes can trigger a fresh load when switching to shopping view
-  return { init, refresh: fetchList };
+  return { init, exitSelectionMode };
 })();
 
 /* ═══════════════════════════════════════════════════════════
@@ -404,6 +582,14 @@ const Modes = (() => {
     DOM.shopping.classList.remove('active');
     DOM.screensaver.classList.add('active');
     Inactivity.stopCountdown();
+    ShoppingList.exitSelectionMode(); // clean up any in-progress selection
+  }
+
+  function initButton() {
+    DOM.btnScreensaver.addEventListener('click', function (e) {
+      e.stopPropagation(); // don't let the click bubble and immediately re-open shopping
+      activateScreensaver();
+    });
   }
 
   function activateShopping() {
@@ -412,7 +598,6 @@ const Modes = (() => {
     DOM.screensaver.classList.remove('active');
     DOM.shopping.classList.add('active');
     DOM.shoppingList.scrollTop = 0;
-    ShoppingList.refresh();
     // Hide tap hint permanently after first interaction
     DOM.tapHint.classList.add('hidden');
   }
@@ -426,7 +611,7 @@ const Modes = (() => {
 
   function getCurrent() { return current; }
 
-  return { activateScreensaver, activateShopping, toggle, getCurrent };
+  return { activateScreensaver, activateShopping, toggle, getCurrent, initButton };
 })();
 
 /* ═══════════════════════════════════════════════════════════
@@ -505,4 +690,5 @@ const Inactivity = (() => {
   Weather.init();
   ShoppingList.init();
   Inactivity.init();
+  Modes.initButton();
 })();
