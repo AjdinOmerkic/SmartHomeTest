@@ -1,8 +1,10 @@
 /* ═══════════════════════════════════════════════════════════
    SMART HOME DASHBOARD — styles.css
    Two themes:
-     dark  (default) — dark matte charcoal + olive + gold
+     dark  (default) — dark charcoal neumorphism + olive + gold
      light           — warm beige neumorphism + olive accents
+   Both themes use the same neumorphic shadow system; the CSS
+   variables drive the palette so only the values change.
 ═══════════════════════════════════════════════════════════ */
 
 /* ─── Reset & base ─────────────────────────────────────── */
@@ -13,7 +15,7 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-/* ── Dark theme (default) ───────────────────────────────── */
+/* ── Dark theme (default) — charcoal neumorphism ─────── */
 :root {
   --charcoal:   #1a1c14;
   --surface:    #23261a;
@@ -27,11 +29,11 @@
   --danger:     #c0392b;
   --radius:     18px;
   --transition: 600ms cubic-bezier(0.4, 0, 0.2, 1);
-  /* Neumorphism shadows — off in dark mode */
-  --neu-dark:  transparent;
-  --neu-light: transparent;
-  --neu-inset-dark:  transparent;
-  --neu-inset-light: transparent;
+  /* Dark neumorphism — deep olive-charcoal shadows */
+  --neu-dark:        rgba(9, 10, 6, 0.92);
+  --neu-light:       rgba(42, 46, 30, 0.72);
+  --neu-inset-dark:  rgba(9, 10, 6, 0.78);
+  --neu-inset-light: rgba(42, 46, 30, 0.60);
 }
 
 /* ── Light beige neumorphism theme ──────────────────────── */
@@ -46,9 +48,9 @@
   --text:      #252210;
   --text-dim:  #6b6040;
   --danger:    #b03020;
-  /* Neumorphism shadow pair: warm dark + clean light */
-  --neu-dark:  rgba(148, 136, 96, 0.55);
-  --neu-light: rgba(255, 255, 248, 0.95);
+  /* Light neumorphism — warm brown / near-white */
+  --neu-dark:        rgba(148, 136, 96, 0.55);
+  --neu-light:       rgba(255, 255, 248, 0.95);
   --neu-inset-dark:  rgba(148, 136, 96, 0.45);
   --neu-inset-light: rgba(255, 255, 248, 0.85);
 }
@@ -64,7 +66,6 @@ html, body {
   touch-action: manipulation;
   user-select: none;
   -webkit-user-select: none;
-  /* Smooth theme crossfade */
   transition: background-color 350ms ease, color 350ms ease;
 }
 
@@ -153,7 +154,6 @@ html, body {
   z-index: 1;
   width: 100%;
   max-width: 900px;
-  /* Ensure content never overflows off-screen on small tablets */
   overflow-y: auto;
   max-height: 100vh;
   scrollbar-width: none;
@@ -173,10 +173,9 @@ html, body {
   font-weight: 200;
   letter-spacing: -0.03em;
   color: var(--text);
-  /* Tabular nums prevents width jitter as digits change */
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";
-  text-shadow: 0 0 60px rgba(201, 168, 76, 0.15);
+  text-shadow: 0 0 60px rgba(201, 168, 76, 0.18);
   line-height: 1;
 }
 
@@ -212,12 +211,12 @@ html, body {
   display: flex;
   align-items: center;
   gap: 3vw;
-  background: rgba(44, 48, 32, 0.45);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(201, 168, 76, 0.12);
+  background: var(--charcoal);
   border-radius: var(--radius);
   padding: 2.5vh 4vw;
+  box-shadow:
+    6px 6px 16px var(--neu-dark),
+    -6px -6px 16px var(--neu-light);
 }
 
 .weather-icon {
@@ -267,14 +266,14 @@ html, body {
   flex-direction: column;
   align-items: center;
   gap: 0.4em;
-  background: rgba(44, 48, 32, 0.35);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(201, 168, 76, 0.08);
+  background: var(--charcoal);
   border-radius: 12px;
   padding: 1.2vh 2.5vw;
   min-width: 70px;
   animation: fadeUp 400ms ease both;
+  box-shadow:
+    4px 4px 10px var(--neu-dark),
+    -4px -4px 10px var(--neu-light);
 }
 
 .forecast-day-name {
@@ -333,6 +332,33 @@ html, body {
 
 .tap-hint.hidden { display: none; }
 
+/* ─── Saver screen indicator dots ──────────────────────── */
+.saver-dots {
+  position: absolute;
+  bottom: 8.5vh;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 10px;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-dim);
+  opacity: 0.3;
+  transition: opacity 350ms ease, background 350ms ease, transform 350ms ease;
+}
+
+.dot.dot-active {
+  background: var(--gold);
+  opacity: 0.85;
+  transform: scale(1.3);
+}
+
 /* ─── Shopping list layout ──────────────────────────────── */
 #shopping {
   display: flex;
@@ -357,25 +383,28 @@ html, body {
 /* Back-to-screensaver button */
 .btn-screensaver {
   margin-left: auto;
-  background: rgba(44, 48, 32, 0.6);
-  border: 1px solid rgba(201, 168, 76, 0.2);
+  background: var(--charcoal);
+  border: none;
   border-radius: 50px;
   color: var(--text-dim);
   font-size: clamp(16px, 3.5vw, 24px);
   padding: 0.4em 1em;
   cursor: pointer;
   line-height: 1;
-  transition: background 200ms ease, border-color 200ms ease, color 200ms ease;
-  /* Large touch target */
   min-width: 56px;
   min-height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
+  box-shadow:
+    3px 3px 8px var(--neu-dark),
+    -3px -3px 8px var(--neu-light);
+  transition: box-shadow 200ms ease, color 200ms ease;
 }
 .btn-screensaver:active {
-  background: rgba(201, 168, 76, 0.15);
-  border-color: rgba(201, 168, 76, 0.5);
+  box-shadow:
+    inset 3px 3px 7px var(--neu-inset-dark),
+    inset -3px -3px 7px var(--neu-inset-light);
   color: var(--gold);
 }
 
@@ -403,7 +432,6 @@ html, body {
   overflow-y: auto;
   overflow-x: hidden;
   padding: 2vh 5vw 12vh;
-  /* Custom scrollbar — minimal */
   scrollbar-width: thin;
   scrollbar-color: var(--surface2) transparent;
   -webkit-overflow-scrolling: touch;
@@ -421,20 +449,16 @@ html, body {
   display: flex;
   align-items: center;
   gap: 3.5vw;
-  background: rgba(35, 38, 26, 0.7);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(124, 138, 58, 0.15);
+  background: var(--charcoal);
   border-radius: var(--radius);
   padding: 4vw 5vw;
   margin-bottom: 2.5vw;
   min-height: 72px;
   box-shadow:
-    0 2px 8px rgba(0, 0, 0, 0.3),
-    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+    6px 6px 14px var(--neu-dark),
+    -6px -6px 14px var(--neu-light);
   animation: cardEntrance 350ms cubic-bezier(0.34, 1.36, 0.64, 1) both;
   cursor: default;
-  /* Prevent layout thrash during scroll */
   contain: layout style;
 }
 
@@ -451,10 +475,10 @@ html, body {
 .card:nth-child(10) { animation-delay: 300ms; }
 
 .card:active {
-  background: rgba(44, 48, 32, 0.8);
-  border-color: rgba(201, 168, 76, 0.3);
-  transform: scale(0.98);
-  transition: transform 100ms ease, background 100ms ease, border-color 100ms ease;
+  box-shadow:
+    inset 4px 4px 10px var(--neu-inset-dark),
+    inset -4px -4px 10px var(--neu-inset-light);
+  transition: box-shadow 100ms ease;
 }
 
 @keyframes cardEntrance {
@@ -474,8 +498,8 @@ html, body {
   border-radius: 50%;
   background: var(--gold);
   flex-shrink: 0;
-  opacity: 0.7;
-  box-shadow: 0 0 8px rgba(201, 168, 76, 0.4);
+  opacity: 0.75;
+  box-shadow: 0 0 8px rgba(201, 168, 76, 0.45);
 }
 
 .card-text {
@@ -559,16 +583,13 @@ html, body {
 }
 
 .card.selected {
-  border-color: rgba(201, 168, 76, 0.65);
-  background: rgba(201, 168, 76, 0.07);
   box-shadow:
-    0 8px 28px rgba(201, 168, 76, 0.22),
-    0 2px 8px rgba(0, 0, 0, 0.3),
-    inset 0 1px 0 rgba(201, 168, 76, 0.18);
+    inset 4px 4px 10px var(--neu-inset-dark),
+    inset -4px -4px 10px var(--neu-inset-light),
+    0 0 20px rgba(124, 138, 58, 0.3);
   animation: itemFloat 2.2s ease-in-out infinite;
 }
 
-/* Stagger float phase so multiple selected cards feel independent */
 .card.selected:nth-child(odd)  { animation-delay: 0ms;    }
 .card.selected:nth-child(even) { animation-delay: 550ms;  }
 .card.selected:nth-child(3n)   { animation-delay: 1100ms; }
@@ -607,8 +628,9 @@ html, body {
   align-items: center;
   gap: 2vw;
   padding: 2vh 5vw;
-  background: rgba(35, 38, 26, 0.95);
-  border-bottom: 1px solid rgba(124, 138, 58, 0.25);
+  background: var(--charcoal);
+  border-bottom: none;
+  box-shadow: 0 4px 14px var(--neu-dark);
   flex-shrink: 0;
   animation: slideDown 220ms cubic-bezier(0.34, 1.36, 0.64, 1);
   z-index: 5;
@@ -617,20 +639,24 @@ html, body {
 .add-input {
   flex: 1;
   background: var(--surface2);
-  border: 1px solid rgba(124, 138, 58, 0.35);
+  border: none;
   border-radius: 12px;
   color: var(--text);
   font-size: clamp(16px, 3vw, 22px);
   padding: 0.65em 1em;
   outline: none;
   caret-color: var(--gold);
-  /* Prevent iOS zoom on focus — font-size must be >= 16px */
   font-family: inherit;
+  box-shadow:
+    inset 3px 3px 7px var(--neu-inset-dark),
+    inset -3px -3px 7px var(--neu-inset-light);
 }
 
 .add-input:focus {
-  border-color: rgba(201, 168, 76, 0.6);
-  box-shadow: 0 0 0 3px rgba(201, 168, 76, 0.12);
+  box-shadow:
+    inset 3px 3px 7px var(--neu-inset-dark),
+    inset -3px -3px 7px var(--neu-inset-light),
+    0 0 0 2px rgba(201, 168, 76, 0.35);
 }
 
 .add-input::placeholder { color: var(--text-dim); opacity: 0.55; }
@@ -658,9 +684,11 @@ html, body {
 }
 
 .btn-form-cancel {
-  background: var(--surface2);
+  background: var(--charcoal);
   color: var(--text-dim);
-  border: 1px solid rgba(255,255,255,0.06);
+  box-shadow:
+    3px 3px 7px var(--neu-dark),
+    -3px -3px 7px var(--neu-light);
 }
 
 /* ─── FAB (floating add button) ─────────────────────────── */
@@ -681,15 +709,19 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 22px rgba(201, 168, 76, 0.45), 0 2px 6px rgba(0,0,0,0.4);
-  transition: transform 180ms cubic-bezier(0.34, 1.36, 0.64, 1),
-              box-shadow 180ms ease;
+  box-shadow:
+    5px 5px 14px var(--neu-dark),
+    -5px -5px 14px var(--neu-light),
+    0 0 20px rgba(201, 168, 76, 0.3);
+  transition: box-shadow 180ms ease, transform 180ms cubic-bezier(0.34, 1.36, 0.64, 1);
   z-index: 15;
 }
 
 .btn-add:active {
   transform: scale(0.9);
-  box-shadow: 0 2px 10px rgba(201, 168, 76, 0.3);
+  box-shadow:
+    inset 3px 3px 8px rgba(0,0,0,0.25),
+    inset -3px -3px 8px rgba(255,255,255,0.1);
 }
 
 /* ─── Selection action bar ───────────────────────────────── */
@@ -704,8 +736,9 @@ html, body {
   left: 0;
   right: 0;
   height: 62px;
-  background: var(--surface2);
-  border-top: 1px solid rgba(201, 168, 76, 0.2);
+  background: var(--charcoal);
+  border-top: none;
+  box-shadow: 0 -4px 14px var(--neu-dark);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -724,7 +757,7 @@ html, body {
   cursor: pointer;
   min-height: 40px;
   min-width: 70px;
-  transition: opacity 150ms ease, transform 150ms ease;
+  transition: opacity 150ms ease, transform 150ms ease, box-shadow 150ms ease;
   font-family: inherit;
   white-space: nowrap;
 }
@@ -733,9 +766,17 @@ html, body {
 .sel-btn:disabled { opacity: 0.35; pointer-events: none; }
 
 .sel-cancel {
-  background: transparent;
+  background: var(--charcoal);
   color: var(--text-dim);
-  border: 1px solid rgba(255,255,255,0.1);
+  box-shadow:
+    3px 3px 7px var(--neu-dark),
+    -3px -3px 7px var(--neu-light);
+}
+
+.sel-cancel:active {
+  box-shadow:
+    inset 2px 2px 5px var(--neu-inset-dark),
+    inset -2px -2px 5px var(--neu-inset-light);
 }
 
 .sel-delete {
@@ -750,7 +791,6 @@ html, body {
   border: 1px solid rgba(192, 57, 43, 0.25);
 }
 
-/* "Sure?" confirmation state */
 .sel-danger[data-confirm="1"] {
   background: rgba(192, 57, 43, 0.45);
   border-color: rgba(192, 57, 43, 0.7);
@@ -779,8 +819,8 @@ html, body {
 }
 
 .saver-btn {
-  background: rgba(44, 48, 32, 0.45);
-  border: 1px solid rgba(201, 168, 76, 0.18);
+  background: var(--charcoal);
+  border: none;
   border-radius: 50px;
   color: var(--text-dim);
   font-size: clamp(12px, 2vw, 16px);
@@ -791,25 +831,27 @@ html, body {
   min-width: 52px;
   min-height: 40px;
   cursor: pointer;
-  transition: background 200ms ease, border-color 200ms ease, color 200ms ease;
+  box-shadow:
+    4px 4px 10px var(--neu-dark),
+    -4px -4px 10px var(--neu-light);
+  transition: box-shadow 200ms ease, color 200ms ease;
   display: flex;
   align-items: center;
   justify-content: center;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
 }
 
 .saver-btn:active {
-  background: rgba(201, 168, 76, 0.2);
-  border-color: rgba(201, 168, 76, 0.5);
-  color: var(--gold);
+  box-shadow:
+    inset 3px 3px 7px var(--neu-inset-dark),
+    inset -3px -3px 7px var(--neu-inset-light);
+  color: var(--olive);
 }
 
 /* Language button in shopping header */
 .btn-header-icon {
   margin-left: auto;
-  background: rgba(44, 48, 32, 0.5);
-  border: 1px solid rgba(201, 168, 76, 0.18);
+  background: var(--charcoal);
+  border: none;
   border-radius: 50px;
   color: var(--text-dim);
   font-size: clamp(12px, 2.2vw, 16px);
@@ -823,224 +865,17 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 200ms ease, border-color 200ms ease, color 200ms ease;
+  box-shadow:
+    3px 3px 8px var(--neu-dark),
+    -3px -3px 8px var(--neu-light);
+  transition: box-shadow 200ms ease, color 200ms ease;
 }
 
 .btn-header-icon:active {
-  background: rgba(201, 168, 76, 0.15);
-  border-color: rgba(201, 168, 76, 0.45);
-  color: var(--gold);
-}
-
-/* ─── Light neumorphism overrides ───────────────────────── */
-
-/* Raised surface — used for cards, weather block, forecasts */
-.neu-raised {
-  box-shadow:
-    6px 6px 16px var(--neu-dark),
-    -6px -6px 16px var(--neu-light);
-}
-
-[data-theme="light"] #screensaver {
-  background: var(--charcoal);
-}
-
-[data-theme="light"] .bg-blob { opacity: 0.10; }
-
-[data-theme="light"] .clock-time {
-  color: var(--text);
-  text-shadow: none;
-}
-
-[data-theme="light"] .weather-current {
-  background: var(--charcoal);
-  border: none;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-  box-shadow:
-    6px 6px 16px var(--neu-dark),
-    -6px -6px 16px var(--neu-light);
-}
-
-[data-theme="light"] .forecast-day {
-  background: var(--charcoal);
-  border: none;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-  box-shadow:
-    4px 4px 10px var(--neu-dark),
-    -4px -4px 10px var(--neu-light);
-}
-
-[data-theme="light"] .saver-btn {
-  background: var(--charcoal);
-  border: none;
-  color: var(--text-dim);
-  box-shadow:
-    4px 4px 10px var(--neu-dark),
-    -4px -4px 10px var(--neu-light);
-}
-
-[data-theme="light"] .saver-btn:active {
   box-shadow:
     inset 3px 3px 7px var(--neu-inset-dark),
     inset -3px -3px 7px var(--neu-inset-light);
   color: var(--olive);
-}
-
-[data-theme="light"] .card {
-  background: var(--charcoal);
-  border: none;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-  box-shadow:
-    6px 6px 14px var(--neu-dark),
-    -6px -6px 14px var(--neu-light);
-}
-
-[data-theme="light"] .card:active {
-  box-shadow:
-    inset 4px 4px 10px var(--neu-inset-dark),
-    inset -4px -4px 10px var(--neu-inset-light);
-}
-
-[data-theme="light"] .card.selected {
-  background: var(--charcoal);
-  border: none;
-  box-shadow:
-    inset 4px 4px 10px var(--neu-inset-dark),
-    inset -4px -4px 10px var(--neu-inset-light),
-    0 0 18px rgba(107, 122, 48, 0.25);
-  animation: itemFloat 2.2s ease-in-out infinite;
-}
-
-[data-theme="light"] .card-bullet {
-  background: var(--olive);
-  box-shadow: 0 0 6px rgba(107, 122, 48, 0.35);
-}
-
-[data-theme="light"] .card-check {
-  background: var(--olive);
-  color: #fff;
-}
-
-[data-theme="light"] .shopping-header {
-  background: linear-gradient(180deg, var(--charcoal) 60%, transparent);
-}
-
-[data-theme="light"] .add-form {
-  background: var(--charcoal);
-  border-bottom-color: rgba(107, 122, 48, 0.2);
-}
-
-[data-theme="light"] .add-input {
-  background: var(--surface2);
-  color: var(--text);
-  border-color: rgba(107, 122, 48, 0.25);
-  box-shadow:
-    inset 3px 3px 7px var(--neu-inset-dark),
-    inset -3px -3px 7px var(--neu-inset-light);
-}
-
-[data-theme="light"] .add-input:focus {
-  border-color: var(--olive);
-  box-shadow:
-    inset 3px 3px 7px var(--neu-inset-dark),
-    inset -3px -3px 7px var(--neu-inset-light),
-    0 0 0 2px rgba(107, 122, 48, 0.18);
-}
-
-[data-theme="light"] .btn-form-confirm {
-  background: var(--olive);
-  color: #fff;
-}
-
-[data-theme="light"] .btn-form-cancel {
-  background: var(--surface2);
-  box-shadow:
-    3px 3px 7px var(--neu-dark),
-    -3px -3px 7px var(--neu-light);
-  border: none;
-}
-
-[data-theme="light"] .btn-add {
-  background: var(--olive);
-  color: #fff;
-  box-shadow:
-    5px 5px 14px var(--neu-dark),
-    -5px -5px 14px var(--neu-light),
-    0 0 20px rgba(107, 122, 48, 0.3);
-}
-
-[data-theme="light"] .selection-bar {
-  background: var(--surface);
-  border-top-color: rgba(107, 122, 48, 0.2);
-  box-shadow: 0 -4px 14px var(--neu-dark);
-}
-
-[data-theme="light"] .sel-cancel {
-  background: var(--charcoal);
-  color: var(--text-dim);
-  border: none;
-  box-shadow:
-    3px 3px 7px var(--neu-dark),
-    -3px -3px 7px var(--neu-light);
-}
-
-[data-theme="light"] .sel-delete {
-  background: rgba(176, 48, 32, 0.12);
-  color: #b03020;
-  border-color: rgba(176, 48, 32, 0.3);
-}
-
-[data-theme="light"] .sel-danger {
-  background: rgba(176, 48, 32, 0.08);
-  color: #b03020;
-  border-color: rgba(176, 48, 32, 0.2);
-}
-
-[data-theme="light"] .btn-screensaver,
-[data-theme="light"] .btn-header-icon {
-  background: var(--charcoal);
-  border: none;
-  color: var(--text-dim);
-  box-shadow:
-    3px 3px 8px var(--neu-dark),
-    -3px -3px 8px var(--neu-light);
-}
-
-[data-theme="light"] .tap-hint { color: var(--text-dim); }
-
-[data-theme="light"] .return-bar { background: rgba(0,0,0,0.08); }
-[data-theme="light"] .return-bar-fill {
-  background: linear-gradient(90deg, var(--forest), var(--olive));
-}
-
-/* ─── Saver screen indicator dots ──────────────────────── */
-.saver-dots {
-  position: absolute;
-  bottom: 8.5vh;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  gap: 10px;
-  z-index: 5;
-  pointer-events: none;
-}
-
-.dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--text-dim);
-  opacity: 0.3;
-  transition: opacity 350ms ease, background 350ms ease, transform 350ms ease;
-}
-
-.dot.dot-active {
-  background: var(--gold);
-  opacity: 0.85;
-  transform: scale(1.3);
 }
 
 /* ─── News screen ────────────────────────────────────────── */
@@ -1065,8 +900,8 @@ html, body {
 }
 
 .news-tab {
-  background: rgba(44, 48, 32, 0.45);
-  border: 1px solid rgba(201, 168, 76, 0.18);
+  background: var(--charcoal);
+  border: none;
   border-radius: 50px;
   color: var(--text-dim);
   font-size: clamp(12px, 2vw, 16px);
@@ -1076,15 +911,17 @@ html, body {
   padding: 0.45em 1.3em;
   min-height: 42px;
   cursor: pointer;
-  transition: background 200ms ease, border-color 200ms ease, color 200ms ease;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  box-shadow:
+    3px 3px 8px var(--neu-dark),
+    -3px -3px 8px var(--neu-light);
+  transition: box-shadow 200ms ease, color 200ms ease;
 }
 
 .news-tab.active {
-  background: rgba(201, 168, 76, 0.15);
-  border-color: rgba(201, 168, 76, 0.5);
-  color: var(--gold);
+  box-shadow:
+    inset 2px 2px 6px var(--neu-inset-dark),
+    inset -2px -2px 6px var(--neu-inset-light);
+  color: var(--olive);
 }
 
 .news-tab:active { transform: scale(0.95); }
@@ -1114,7 +951,7 @@ html, body {
 
 .news-item {
   padding: 2vh 0;
-  border-bottom: 1px solid rgba(201, 168, 76, 0.07);
+  border-bottom: 1px solid rgba(124, 138, 58, 0.08);
   animation: fadeUp 350ms ease both;
 }
 
@@ -1144,25 +981,81 @@ html, body {
   letter-spacing: 0.06em;
 }
 
-/* ─── Light theme — news overrides ──────────────────────── */
-[data-theme="light"] .news-tab {
-  background: var(--charcoal);
-  border: none;
-  box-shadow: 3px 3px 8px var(--neu-dark), -3px -3px 8px var(--neu-light);
+/* ─── Light theme overrides ─────────────────────────────── */
+/* The CSS variable system handles most of the palette swap;
+   these overrides handle things that can't be done with vars. */
+
+[data-theme="light"] .bg-blob { opacity: 0.10; }
+
+[data-theme="light"] .clock-time { text-shadow: none; }
+
+[data-theme="light"] .card-check {
+  background: var(--olive);
+  color: #fff;
 }
 
-[data-theme="light"] .news-tab.active {
-  background: var(--surface2);
+[data-theme="light"] .card.selected {
   box-shadow:
-    inset 2px 2px 5px var(--neu-inset-dark),
-    inset -2px -2px 5px var(--neu-inset-light);
-  color: var(--olive);
-  border: none;
+    inset 4px 4px 10px var(--neu-inset-dark),
+    inset -4px -4px 10px var(--neu-inset-light),
+    0 0 18px rgba(107, 122, 48, 0.25);
+  animation: itemFloat 2.2s ease-in-out infinite;
 }
 
-[data-theme="light"] #news { background: var(--charcoal); }
-[data-theme="light"] .news-header {
-  background: linear-gradient(180deg, var(--charcoal) 65%, transparent);
+[data-theme="light"] .card-bullet {
+  background: var(--olive);
+  box-shadow: 0 0 6px rgba(107, 122, 48, 0.35);
+}
+
+[data-theme="light"] .return-bar { background: rgba(0,0,0,0.08); }
+[data-theme="light"] .return-bar-fill {
+  background: linear-gradient(90deg, var(--forest), var(--olive));
+}
+
+[data-theme="light"] .sel-delete {
+  background: rgba(176, 48, 32, 0.12);
+  color: #b03020;
+  border-color: rgba(176, 48, 32, 0.3);
+}
+
+[data-theme="light"] .sel-danger {
+  background: rgba(176, 48, 32, 0.08);
+  color: #b03020;
+  border-color: rgba(176, 48, 32, 0.2);
+}
+
+[data-theme="light"] .btn-form-confirm {
+  background: var(--olive);
+  color: #fff;
+}
+
+[data-theme="light"] .btn-add {
+  background: var(--olive);
+  color: #fff;
+  box-shadow:
+    5px 5px 14px var(--neu-dark),
+    -5px -5px 14px var(--neu-light),
+    0 0 20px rgba(107, 122, 48, 0.3);
+}
+
+[data-theme="light"] .add-input {
+  color: var(--text);
+}
+
+[data-theme="light"] .add-input:focus {
+  box-shadow:
+    inset 3px 3px 7px var(--neu-inset-dark),
+    inset -3px -3px 7px var(--neu-inset-light),
+    0 0 0 2px rgba(107, 122, 48, 0.2);
+}
+
+[data-theme="light"] .tap-hint { color: var(--text-dim); }
+
+/* ─── Neu raised helper (can be applied in HTML if needed) ─ */
+.neu-raised {
+  box-shadow:
+    6px 6px 16px var(--neu-dark),
+    -6px -6px 16px var(--neu-light);
 }
 
 /* ─── Landscape + large screens ─────────────────────────── */

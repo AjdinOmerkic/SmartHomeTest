@@ -424,8 +424,10 @@ const Weather = (() => {
 const News = (() => {
   const cfg = CONFIG.news;
 
-  // Two public CORS proxies, tried in order on failure
-  const PROXIES = [
+  // rss2json converts any RSS/Atom feed to JSON and handles CORS natively.
+  // Fallback: allorigins raw proxy + XML parser (in case rss2json rate-limits).
+  const RSS2JSON  = url => 'https://api.rss2json.com/v1/api.json?rss_url=' + encodeURIComponent(url);
+  const PROXIES   = [
     url => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url),
     url => 'https://corsproxy.io/?' + encodeURIComponent(url),
   ];
@@ -433,7 +435,7 @@ const News = (() => {
   let currentSrc = 0;
   let cache = {};  // source index → articles array
 
-  // ─── Fetch with timeout and proxy fallback ───────────────
+  // ─── Fetch helpers ────────────────────────────────────────
 
   async function fetchWithTimeout(url, ms) {
     const ctrl  = new AbortController();
@@ -448,7 +450,26 @@ const News = (() => {
     }
   }
 
+  // Primary: rss2json.com (purpose-built, handles CORS, returns clean JSON)
+  async function fetchViaRSS2JSON(rssUrl) {
+    const res = await fetchWithTimeout(RSS2JSON(rssUrl), 10000);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    if (data.status !== 'ok') throw new Error(data.message || 'feed error');
+    return data.items.slice(0, cfg.maxItems).map(item => ({
+      title:   (item.title || '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').trim(),
+      link:    item.link || '',
+      pubDate: item.pubDate || '',
+    })).filter(a => a.title);
+  }
+
+  // Fallback: CORS proxies + XML parser
   async function fetchRSS(rssUrl) {
+    try {
+      return await fetchViaRSS2JSON(rssUrl);
+    } catch (e) {
+      console.warn('[News] rss2json failed, trying raw proxies:', e.message);
+    }
     let lastErr;
     for (const proxy of PROXIES) {
       try {
@@ -457,21 +478,18 @@ const News = (() => {
         return parseRSS(await res.text());
       } catch (e) {
         lastErr = e;
-        console.warn('[News] proxy failed, trying next:', e.message);
+        console.warn('[News] proxy failed:', e.message);
       }
     }
-    throw lastErr;
+    throw lastErr || new Error('All fetch methods failed');
   }
 
-  // ─── RSS / Atom parser ───────────────────────────────────
+  // ─── RSS / Atom XML parser (fallback only) ───────────────
 
   function parseRSS(xmlText) {
     const doc = new DOMParser().parseFromString(xmlText, 'application/xml');
-
-    // Abort if parser returned an error document
     if (doc.querySelector('parsererror')) throw new Error('XML parse error');
 
-    // RSS 2.0 uses <item>, Atom uses <entry>
     let items = [...doc.querySelectorAll('item')];
     const isAtom = items.length === 0;
     if (isAtom) items = [...doc.querySelectorAll('entry')];
@@ -976,8 +994,9 @@ const SwipeHandler = (() => {
         // swipe left (dx < 0) → next screen; swipe right (dx > 0) → prev screen
         Modes.switchSaver(dx < 0 ? 1 : -1);
         Inactivity.reset();
-      } else if (isTap) {
-        // Don't navigate when tapping an interactive control
+      } else if (isTap && Modes.getSaverIndex() === 0) {
+        // Only the clock/weather screen (index 0) opens shopping on tap.
+        // The news screen (index 1) is read-only — touches scroll the feed.
         const target = e.target;
         if (target.closest('button, a, input, select')) return;
         Modes.activateShopping();
@@ -985,9 +1004,10 @@ const SwipeHandler = (() => {
       }
     }, { passive: true });
 
-    // Mouse fallback for desktop testing
+    // Mouse fallback for desktop testing — same rule: only from screen 0
     document.addEventListener('click', e => {
       if (Modes.getCurrent() !== 'saver') return;
+      if (Modes.getSaverIndex() !== 0) return;
       if (e.target.closest('button, a, input, select')) return;
       Modes.activateShopping();
       Inactivity.reset();
