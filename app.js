@@ -45,13 +45,15 @@ const CONFIG = {
   },
 
   /* ── News RSS sources ───────────────────────────────── */
+  // Uses Google News RSS search (site:domain) — reliable, always valid XML,
+  // no API key needed. To swap a source just change the q= domain.
   news: {
-    updateIntervalMs: 300_000,   // refresh every 5 minutes
-    maxItems: 12,                // headlines per source
+    updateIntervalMs: 600_000,   // refresh every 10 minutes
+    maxItems: 12,
     sources: [
-      { label: 'Klix.ba',     rss: 'https://www.klix.ba/rss/vijesti' },
-      { label: 'Oslobođenje', rss: 'https://oslobodjenje.ba/rss/feed' },
-      { label: 'Avaz',        rss: 'https://avaz.ba/rss' },
+      { label: 'Klix.ba',     rss: 'https://news.google.com/rss/search?q=site:klix.ba&hl=bs&gl=BA&ceid=BA:bs' },
+      { label: 'Oslobođenje', rss: 'https://news.google.com/rss/search?q=site:oslobodjenje.ba&hl=bs&gl=BA&ceid=BA:bs' },
+      { label: 'Avaz',        rss: 'https://news.google.com/rss/search?q=site:avaz.ba&hl=bs&gl=BA&ceid=BA:bs' },
     ],
   },
 
@@ -424,10 +426,9 @@ const Weather = (() => {
 const News = (() => {
   const cfg = CONFIG.news;
 
-  // rss2json converts any RSS/Atom feed to JSON and handles CORS natively.
-  // Fallback: allorigins raw proxy + XML parser (in case rss2json rate-limits).
-  const RSS2JSON  = url => 'https://api.rss2json.com/v1/api.json?rss_url=' + encodeURIComponent(url);
-  const PROXIES   = [
+  // CORS proxy chain — tried in order on failure.
+  // Sources are Google News RSS URLs so the proxies always get valid, reachable XML.
+  const PROXIES = [
     url => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url),
     url => 'https://corsproxy.io/?' + encodeURIComponent(url),
   ];
@@ -450,59 +451,41 @@ const News = (() => {
     }
   }
 
-  // Primary: rss2json.com (purpose-built, handles CORS, returns clean JSON)
-  async function fetchViaRSS2JSON(rssUrl) {
-    const res = await fetchWithTimeout(RSS2JSON(rssUrl), 10000);
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const data = await res.json();
-    if (data.status !== 'ok') throw new Error(data.message || 'feed error');
-    return data.items.slice(0, cfg.maxItems).map(item => ({
-      title:   (item.title || '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').trim(),
-      link:    item.link || '',
-      pubDate: item.pubDate || '',
-    })).filter(a => a.title);
-  }
-
-  // Fallback: CORS proxies + XML parser
   async function fetchRSS(rssUrl) {
-    try {
-      return await fetchViaRSS2JSON(rssUrl);
-    } catch (e) {
-      console.warn('[News] rss2json failed, trying raw proxies:', e.message);
-    }
     let lastErr;
     for (const proxy of PROXIES) {
       try {
-        const res = await fetchWithTimeout(proxy(rssUrl), 9000);
+        const res = await fetchWithTimeout(proxy(rssUrl), 12000);
         if (!res.ok) throw new Error('HTTP ' + res.status);
-        return parseRSS(await res.text());
+        const text = await res.text();
+        return parseRSS(text);
       } catch (e) {
         lastErr = e;
-        console.warn('[News] proxy failed:', e.message);
+        console.warn('[News] proxy failed, trying next:', e.message);
       }
     }
-    throw lastErr || new Error('All fetch methods failed');
+    throw lastErr || new Error('All proxies failed');
   }
 
-  // ─── RSS / Atom XML parser (fallback only) ───────────────
+  // ─── RSS XML parser ───────────────────────────────────────
+  // Google News RSS is standard RSS 2.0. Article titles include a
+  // " - Source Name" suffix that we strip for cleaner display.
 
   function parseRSS(xmlText) {
     const doc = new DOMParser().parseFromString(xmlText, 'application/xml');
     if (doc.querySelector('parsererror')) throw new Error('XML parse error');
 
-    let items = [...doc.querySelectorAll('item')];
-    const isAtom = items.length === 0;
-    if (isAtom) items = [...doc.querySelectorAll('entry')];
+    const items = [...doc.querySelectorAll('item')];
+    if (items.length === 0) throw new Error('Empty feed');
 
     return items.slice(0, cfg.maxItems).map(el => {
-      const title = el.querySelector('title')?.textContent?.trim() || '';
-      const link  = isAtom
-        ? (el.querySelector('link')?.getAttribute('href') || el.querySelector('link')?.textContent?.trim() || '')
-        : (el.querySelector('link')?.textContent?.trim() || '');
-      const dateStr = isAtom
-        ? (el.querySelector('published')?.textContent || el.querySelector('updated')?.textContent || '')
-        : (el.querySelector('pubDate')?.textContent || '');
-      return { title, link, pubDate: dateStr.trim() };
+      let title = el.querySelector('title')?.textContent?.trim() || '';
+      // Strip " - Source Name" suffix Google News appends
+      title = title.replace(/\s+-\s+[^-]+$/, '').trim();
+
+      const pubDate = el.querySelector('pubDate')?.textContent?.trim() || '';
+      const link    = el.querySelector('link')?.textContent?.trim() || '';
+      return { title, link, pubDate };
     }).filter(a => a.title);
   }
 
