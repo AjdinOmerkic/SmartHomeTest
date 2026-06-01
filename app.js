@@ -1325,58 +1325,95 @@ const Climate = (() => {
 
 /* ═══════════════════════════════════════════════════════════
    MODULE: Flowers
-   Full-bleed Unsplash photo screensaver. Two layers crossfade
-   so there is never a flash of black between images.
-   Auto-cycles every 30 min; long-press anywhere skips early
-   and resets the 30-minute timer.
+   Pulls botanical watercolors + floral art from the Metropolitan
+   Museum of Art open API (free, no key). Two layers crossfade
+   so there is never a flash of black. Auto-cycles every 30 min;
+   long-press anywhere skips early and resets the timer.
 ═══════════════════════════════════════════════════════════ */
 const Flowers = (() => {
-  const W         = window.innerWidth;
-  const H         = window.innerHeight;
-  const CYCLE_MS  = 30 * 60 * 1000;
+  const CYCLE_MS   = 30 * 60 * 1000;
+  const MET        = 'https://collectionapi.metmuseum.org/public/collection/v1/';
+  // Public-domain flower / botanical art across all artistic media
+  const SEARCH_URL = MET + 'search?hasImages=true&isPublicDomain=true&q=botanical+floral+flowers';
 
-  // source.unsplash.com was shut down in 2023; use picsum.photos instead
-  function buildUrl() {
-    return 'https://picsum.photos/' + W + '/' + H + '?random=' + Date.now();
-  }
-
+  let objectIds       = [];
+  let usedSet         = new Set();
   let frontEl         = null;
   let cycleTimer      = null;
   let isTransitioning = false;
 
-  function backEl() {
-    return frontEl === DOM.flowersLayerA ? DOM.flowersLayerB : DOM.flowersLayerA;
+  // Fetch and shuffle the list of matching object IDs (done once)
+  async function loadIds() {
+    if (objectIds.length) return;
+    const res  = await fetch(SEARCH_URL);
+    const data = await res.json();
+    const ids  = data.objectIDs || [];
+    // Fisher-Yates shuffle so we don't always start from the same works
+    for (let i = ids.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [ids[i], ids[j]] = [ids[j], ids[i]];
+    }
+    objectIds = ids;
   }
 
-  function loadNext() {
+  // Pick an unused object ID, fetch its primaryImage URL
+  async function nextImageUrl() {
+    let pool = objectIds.filter(id => !usedSet.has(id));
+    if (!pool.length) { usedSet.clear(); pool = [...objectIds]; }
+
+    for (let attempt = 0; attempt < 8; attempt++) {
+      const idx = Math.floor(Math.random() * pool.length);
+      const id  = pool.splice(idx, 1)[0];
+      usedSet.add(id);
+      try {
+        const res = await fetch(MET + 'objects/' + id);
+        const obj = await res.json();
+        const url = obj.primaryImage || obj.primaryImageSmall;
+        if (url) return url;
+      } catch { /* try next */ }
+    }
+    return null;
+  }
+
+  // Crossfade the incoming layer, resolve when the transition ends
+  function crossfade(url) {
+    return new Promise((resolve, reject) => {
+      const incoming = frontEl === DOM.flowersLayerA ? DOM.flowersLayerB : DOM.flowersLayerA;
+      const outgoing = frontEl;
+
+      incoming.style.backgroundImage = 'url(' + url + ')';
+
+      const img = new Image();
+      img.onload = () => {
+        incoming.style.zIndex  = '1';
+        incoming.style.opacity = '1';
+        incoming.addEventListener('transitionend', function onEnd(e) {
+          if (e.propertyName !== 'opacity') return;
+          incoming.removeEventListener('transitionend', onEnd);
+          outgoing.style.zIndex = '0';
+          frontEl = incoming;
+          resolve();
+        });
+      };
+      img.onerror = () => reject(new Error('img load failed'));
+      img.src = url;
+    });
+  }
+
+  async function loadNext() {
     if (isTransitioning) return;
     clearTimeout(cycleTimer);
     isTransitioning = true;
 
-    const incoming = backEl();
-    const outgoing  = frontEl;
-    const url       = buildUrl();
+    try {
+      const url = await nextImageUrl();
+      if (url) await crossfade(url);
+    } catch (e) {
+      console.warn('[Flowers]', e.message);
+    }
 
-    incoming.style.backgroundImage = 'url(' + url + ')';
-
-    const img  = new Image();
-    img.onload = () => {
-      incoming.style.zIndex  = '1';
-      incoming.style.opacity = '1';
-      incoming.addEventListener('transitionend', function onEnd(e) {
-        if (e.propertyName !== 'opacity') return;
-        incoming.removeEventListener('transitionend', onEnd);
-        outgoing.style.zIndex = '0';
-        frontEl         = incoming;
-        isTransitioning = false;
-        cycleTimer = setTimeout(loadNext, CYCLE_MS);
-      });
-    };
-    img.onerror = () => {
-      isTransitioning = false;
-      cycleTimer = setTimeout(loadNext, CYCLE_MS);
-    };
-    img.src = url;
+    isTransitioning = false;
+    cycleTimer = setTimeout(loadNext, CYCLE_MS);
   }
 
   function addLongPress(el, cb) {
@@ -1391,27 +1428,31 @@ const Flowers = (() => {
     el.addEventListener('mouseleave',  abort);
   }
 
-  function init() {
+  async function init() {
     frontEl = DOM.flowersLayerA;
-
     DOM.flowersLayerA.style.zIndex  = '1';
     DOM.flowersLayerA.style.opacity = '0';
     DOM.flowersLayerB.style.zIndex  = '0';
     DOM.flowersLayerB.style.opacity = '0';
 
-    const url  = buildUrl();
-    DOM.flowersLayerA.style.backgroundImage = 'url(' + url + ')';
+    try {
+      await loadIds();
+      const url = await nextImageUrl();
+      if (url) {
+        DOM.flowersLayerA.style.backgroundImage = 'url(' + url + ')';
+        await new Promise((resolve, reject) => {
+          const img = new Image();
+          img.onload  = resolve;
+          img.onerror = reject;
+          img.src     = url;
+        });
+        DOM.flowersLayerA.style.opacity = '1';
+      }
+    } catch (e) {
+      console.warn('[Flowers] init:', e.message);
+    }
 
-    const img  = new Image();
-    img.onload = () => {
-      DOM.flowersLayerA.style.opacity = '1';
-      cycleTimer = setTimeout(loadNext, CYCLE_MS);
-    };
-    img.onerror = () => {
-      cycleTimer = setTimeout(loadNext, CYCLE_MS);
-    };
-    img.src = url;
-
+    cycleTimer = setTimeout(loadNext, CYCLE_MS);
     addLongPress(DOM.flowers, loadNext);
   }
 
