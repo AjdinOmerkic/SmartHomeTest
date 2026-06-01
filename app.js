@@ -25,7 +25,7 @@ const CONFIG = {
   sheets: {
     spreadsheetId: '1m9IoejCF9aqKx5yWTKRQXkWQt-pH00ZcCimQ-KrHcNg',
     sheetName:     'Sheet1',
-    scriptUrl:     'YOUR_APPS_SCRIPT_URL',
+    scriptUrl:     'https://script.google.com/macros/s/AKfycbzAvTyvsy03JKqLs2j1ojCttBtrf9LADNz1NAstI-q-8xcGMwQMHhqxn0J_LSUsUW6l/exec',
   },
 
   /* ── Weather (Open-Meteo — free, no API key) ────────── */
