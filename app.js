@@ -1390,7 +1390,8 @@ const Flowers = (() => {
         incoming.addEventListener('transitionend', function onEnd(e) {
           if (e.propertyName !== 'opacity') return;
           incoming.removeEventListener('transitionend', onEnd);
-          outgoing.style.zIndex = '0';
+          outgoing.style.zIndex   = '0';
+          outgoing.style.opacity  = '0';
           frontEl = incoming;
           resolve();
         });
