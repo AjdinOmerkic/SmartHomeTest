@@ -49,6 +49,12 @@ const CONFIG = {
     rss: 'https://www.klix.ba/rss',
   },
 
+  /* ── Room sensor (Arduino DHT11 via Google Apps Script) ─── */
+  sensor: {
+    apiUrl: 'https://script.google.com/macros/s/AKfycbxcpvQ4rfarHfloSrvO5PyR42xYU6lX_G3KnMwflFhe7wZ3jruTIAPAvpl4no1AtxRO/exec',
+    updateIntervalMs: 60_000,    // refresh every 1 minute
+  },
+
 };
 
 /* ═══════════════════════════════════════════════════════════
@@ -69,6 +75,25 @@ const TRANSLATIONS = {
     failedLoad:     'Could not load list',
     tapHint:        'Tap anywhere · Swipe for news',
     weatherUnavail: 'Weather unavailable',
+    temperature:    'Temperature',
+    humidity:       'Humidity',
+    airQuality:     'Air Quality',
+    noSensorData:   'No sensor data',
+    aqLabels: {
+      comfortable: 'Comfortable',
+      moderate:    'Moderate',
+      dry:         'Dry',
+      veryDry:     'Very Dry',
+      dangerDry:   'Dangerously Dry',
+      humid:       'Humid',
+      veryHumid:   'Very Humid',
+      dangerHumid: 'Dangerously Humid',
+      hot:         'Hot',
+      tooHot:      'Too Hot',
+      cool:        'Cool',
+      cold:        'Cold',
+      veryCold:    'Very Cold',
+    },
     itemCount: function(n) { return n + ' item' + (n !== 1 ? 's' : ''); },
     selected:  function(n) { return n + ' selected'; },
     deleteBtn: function(n) { return n > 0 ? 'Delete (' + n + ')' : 'Delete'; },
@@ -99,6 +124,25 @@ const TRANSLATIONS = {
     failedLoad:     'Greška pri učitavanju',
     tapHint:        'Tapnite · Prevucite za vijesti',
     weatherUnavail: 'Nema vremenskih podataka',
+    temperature:    'Temperatura',
+    humidity:       'Vlažnost',
+    airQuality:     'Kvalitet zraka',
+    noSensorData:   'Nema podataka senzora',
+    aqLabels: {
+      comfortable: 'Zrak ugodan',
+      moderate:    'Zrak umjeren',
+      dry:         'Zrak suh',
+      veryDry:     'Zrak izuzetno suh',
+      dangerDry:   'Zrak opasno suh',
+      humid:       'Zrak vlažan',
+      veryHumid:   'Zrak izuzetno vlažan',
+      dangerHumid: 'Zrak opasno vlažan',
+      hot:         'Vruće',
+      tooHot:      'Prevruće',
+      cool:        'Blago hladno',
+      cold:        'Hladno',
+      veryCold:    'Izuzetno hladno',
+    },
     itemCount: function(n) {
       if (n === 1) return '1 stavka';
       if (n >= 2 && n <= 4) return n + ' stavke';
@@ -199,6 +243,7 @@ const I18n = (() => {
     DOM.btnLangSaver.textContent = next;
     Clock.resetDate();
     Weather.refreshDesc();
+    Climate.refreshDisplay();
   }
 
   function setLang(l) {
@@ -251,6 +296,7 @@ const DOM = {
   screensaver:     document.getElementById('screensaver'),
   news:            document.getElementById('news'),
   shopping:        document.getElementById('shopping'),
+  climate:         document.getElementById('climate'),
   // Clock
   clockTime:       document.getElementById('clock-time'),
   clockSeconds:    document.getElementById('clock-seconds'),
@@ -292,6 +338,25 @@ const DOM = {
   newsPopupTitle:    document.getElementById('news-popup-title'),
   newsPopupTime:     document.getElementById('news-popup-time'),
   newsPopupLink:     document.getElementById('news-popup-link'),
+  // Climate screen
+  climateTime:     document.getElementById('climate-time'),
+  climateSecs:     document.getElementById('climate-secs'),
+  climateDate:     document.getElementById('climate-date'),
+  climateLabelTemp:document.getElementById('climate-label-temp'),
+  climateLabelHum: document.getElementById('climate-label-hum'),
+  climateTempVal:  document.getElementById('climate-temp-val'),
+  climateHumVal:   document.getElementById('climate-hum-val'),
+  climateAvgTemp:  document.getElementById('climate-avg-temp'),
+  climateAvgHum:   document.getElementById('climate-avg-hum'),
+  avgToggle:       document.getElementById('avg-toggle'),
+  avgLabel24h:     document.getElementById('avg-label-24h'),
+  avgLabel7d:      document.getElementById('avg-label-7d'),
+  climateLabelAq:  document.getElementById('climate-label-aq'),
+  climateAqDot:    document.getElementById('climate-aq-dot'),
+  climateAqText:   document.getElementById('climate-aq-text'),
+  climateAqEmoji:  document.getElementById('climate-aq-emoji'),
+  climateAqScore:  document.getElementById('climate-aq-score'),
+  climateError:    document.getElementById('climate-error'),
   // Nav
   btnScreensaver:  document.getElementById('btn-screensaver'),
   // Language & theme
@@ -316,14 +381,18 @@ const Clock = (() => {
     const mins = now.getMinutes();
     const secs = now.getSeconds();
 
-    DOM.clockSeconds.textContent = pad(secs);
+    DOM.clockSeconds.textContent  = pad(secs);
+    DOM.climateSecs.textContent   = pad(secs);
 
     if (mins !== prevMin) {
       prevMin = mins;
-      const tr = I18n.t();
-      DOM.clockTime.textContent = pad(hrs) + ':' + pad(mins);
-      DOM.clockDate.textContent =
-        tr.days[now.getDay()] + ', ' + tr.months[now.getMonth()] + ' ' + now.getDate();
+      const tr   = I18n.t();
+      const time = pad(hrs) + ':' + pad(mins);
+      const date = tr.days[now.getDay()] + ', ' + tr.months[now.getMonth()] + ' ' + now.getDate();
+      DOM.clockTime.textContent  = time;
+      DOM.clockDate.textContent  = date;
+      DOM.climateTime.textContent = time;
+      DOM.climateDate.textContent = date;
     }
   }
 
@@ -867,6 +936,192 @@ const ShoppingList = (() => {
 })();
 
 /* ═══════════════════════════════════════════════════════════
+   MODULE: Climate
+   Fetches temperature & humidity from the Arduino sensor log
+   (Google Apps Script endpoint). Shows current readings,
+   24 h / 7 day averages, and an air-quality comfort score.
+═══════════════════════════════════════════════════════════ */
+const Climate = (() => {
+  const cfg = CONFIG.sensor;
+
+  let allData  = [];
+  let showWeek = false;
+
+  // ─── Date parsing (handles ISO, US, and European formats) ──
+
+  function parseTimestamp(raw) {
+    if (!raw) return null;
+    let d = new Date(raw);
+    if (!isNaN(d.getTime())) return d;
+    // DD/MM/YYYY HH:MM:SS
+    const m = String(raw).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})[\s,]+(\d{2}):(\d{2}):(\d{2})/);
+    if (m) return new Date(+m[3], +m[2] - 1, +m[1], +m[4], +m[5], +m[6]);
+    // DD.MM.YYYY HH:MM:SS
+    const m2 = String(raw).match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})[\s,]+(\d{2}):(\d{2}):(\d{2})/);
+    if (m2) return new Date(+m2[3], +m2[2] - 1, +m2[1], +m2[4], +m2[5], +m2[6]);
+    return null;
+  }
+
+  function parseRow(obj) {
+    const isArr = Array.isArray(obj);
+    const ts   = parseTimestamp(isArr ? obj[0] : (obj.Timestamp  || obj.timestamp));
+    const temp = parseFloat   (isArr ? obj[1] : (obj.Temperature ?? obj.temperature));
+    const hum  = parseFloat   (isArr ? obj[2] : (obj.Humidity    ?? obj.humidity));
+    if (!ts || isNaN(temp) || isNaN(hum)) return null;
+    if (temp < -40 || temp > 80 || hum < 0 || hum > 100) return null;
+    return { ts, temp, hum };
+  }
+
+  // ─── Data fetch ───────────────────────────────────────────
+
+  async function fetchData() {
+    const res = await fetch(cfg.apiUrl, { method: 'GET', mode: 'cors' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const ct   = res.headers.get('content-type') || '';
+    const body = ct.includes('application/json') ? await res.json() : await res.text();
+
+    if (Array.isArray(body)) return body.map(parseRow).filter(Boolean);
+
+    // CSV fallback: skip header row, parse the rest
+    const lines = String(body).trim().split('\n');
+    return lines.slice(1).map(line => {
+      const cols = line.split(',').map(c => c.replace(/^"|"$/g, '').trim());
+      return parseRow(cols);
+    }).filter(Boolean);
+  }
+
+  // ─── Air quality (matches your existing esp-dht-dashboard) ─
+
+  function calcAirQuality(temp, hum) {
+    const aq = I18n.t().aqLabels;
+    if (temp == null || hum == null || isNaN(temp) || isNaN(hum)) {
+      return { score: null, label: '—', emoji: '—', cls: '' };
+    }
+
+    let score = 5, labelKey = 'moderate', emoji = '😐';
+
+    if (hum < 15) {
+      score    = Math.max(0, 2 - (15 - hum) / 5);
+      labelKey = hum < 8 ? 'dangerDry' : hum < 12 ? 'veryDry' : 'dry';
+      emoji    = hum < 8 ? '⚠️'        : hum < 12 ? '😟'       : '😕';
+    } else if (hum < 30) {
+      score    = 2 + (hum - 15) / 5;
+      labelKey = hum < 22 ? 'veryDry' : 'dry';
+      emoji    = hum < 22 ? '😕'       : '😐';
+    } else if (hum <= 55) {
+      score = 6 + 4 * (1 - Math.abs(hum - 42) / 20);
+      if      (temp >= 18 && temp <= 24) score = Math.min(10, score + 1);
+      else if (temp >= 15 && temp <= 27) score = Math.min(10, score + 0.5);
+      else if (temp < 10 || temp > 30)   score = Math.max(0,  score - 1.5);
+      if      (score >= 8.5) { labelKey = 'comfortable'; emoji = '😊'; }
+      else if (score >= 7)   { labelKey = 'comfortable'; emoji = '🙂'; }
+      else                   { labelKey = 'moderate';    emoji = '😐'; }
+    } else if (hum <= 75) {
+      score    = 6 - (hum - 55) / 10;
+      labelKey = hum <= 62 ? 'humid' : 'veryHumid';
+      emoji    = hum <= 62 ? '😐'    : '😕';
+    } else {
+      score    = Math.max(0, 3 - (hum - 75) / 15);
+      labelKey = hum > 85 ? 'dangerHumid' : 'veryHumid';
+      emoji    = hum > 85 ? '⚠️'          : '😟';
+    }
+
+    if      (temp >= 35) { labelKey = 'tooHot';  emoji = '🔥'; score = Math.min(score, 1); }
+    else if (temp >= 30) { labelKey = 'tooHot';  emoji = '🔥'; score = Math.min(score, 3); }
+    else if (temp >= 28) { labelKey = 'hot';      emoji = '🌡️'; score = Math.min(score, 5); }
+    else if (temp <= -5) { labelKey = 'veryCold'; emoji = '❄️'; score = Math.min(score, 1); }
+    else if (temp <=  5) { labelKey = 'cold';     emoji = '❄️'; score = Math.min(score, 4); }
+    else if (temp <= 10) { labelKey = 'cool';     emoji = '🥶'; score = Math.min(score, 6); }
+
+    score = Math.round(Math.max(0, Math.min(10, score)));
+    if (score <= 2 && emoji === '😐') emoji = '😟';
+
+    const cls =
+      score >= 9 ? 'aq-excellent' :
+      score >= 7 ? 'aq-good'      :
+      score >= 5 ? 'aq-fair'      :
+      score >= 3 ? 'aq-poor'      : 'aq-very-poor';
+
+    return { score, label: aq[labelKey] || labelKey, emoji, cls };
+  }
+
+  // ─── Render ───────────────────────────────────────────────
+
+  function mean(arr) {
+    if (!arr.length) return null;
+    return arr.reduce((s, v) => s + v, 0) / arr.length;
+  }
+
+  function render() {
+    if (!allData.length) {
+      DOM.climateError.classList.remove('hidden');
+      return;
+    }
+    DOM.climateError.classList.add('hidden');
+
+    const latest = allData[allData.length - 1];
+    DOM.climateTempVal.textContent = latest.temp.toFixed(1) + '°C';
+    DOM.climateHumVal.textContent  = Math.round(latest.hum) + '%';
+
+    const msBack  = (showWeek ? 7 : 1) * 24 * 60 * 60 * 1000;
+    const cutoff  = Date.now() - msBack;
+    const subset  = allData.filter(r => r.ts.getTime() >= cutoff);
+    const avgTemp = mean(subset.map(r => r.temp));
+    const avgHum  = mean(subset.map(r => r.hum));
+
+    DOM.climateAvgTemp.textContent =
+      avgTemp !== null ? avgTemp.toFixed(1) + '°C' : '--.-°C';
+    DOM.climateAvgHum.textContent  =
+      avgHum  !== null ? Math.round(avgHum)  + '%'  : '---%';
+
+    const aq = calcAirQuality(latest.temp, latest.hum);
+    DOM.climateAqDot.className     = 'aq-dot ' + aq.cls;
+    DOM.climateAqText.textContent  = aq.label;
+    DOM.climateAqEmoji.textContent = aq.emoji;
+    DOM.climateAqScore.textContent = aq.score !== null ? aq.score + '/10' : '—';
+  }
+
+  function refreshDisplay() {
+    DOM.climateLabelTemp.textContent = I18n.t().temperature;
+    DOM.climateLabelHum.textContent  = I18n.t().humidity;
+    DOM.climateLabelAq.textContent   = I18n.t().airQuality;
+    DOM.climateError.textContent     = I18n.t().noSensorData;
+    if (allData.length) render();
+  }
+
+  // ─── Load ─────────────────────────────────────────────────
+
+  async function load() {
+    try {
+      const fresh = await fetchData();
+      if (fresh.length) allData = fresh;
+      render();
+    } catch (e) {
+      console.warn('[Climate] fetch failed:', e.message);
+      if (!allData.length) DOM.climateError.classList.remove('hidden');
+    }
+  }
+
+  function togglePeriod() {
+    showWeek = !showWeek;
+    DOM.avgToggle.classList.toggle('on', showWeek);
+    DOM.avgToggle.setAttribute('aria-checked', showWeek);
+    DOM.avgLabel24h.classList.toggle('active', !showWeek);
+    DOM.avgLabel7d.classList.toggle('active',   showWeek);
+    render();
+  }
+
+  function init() {
+    DOM.avgLabel24h.classList.add('active');
+    DOM.avgToggle.addEventListener('click', e => { e.stopPropagation(); togglePeriod(); });
+    load();
+    setInterval(load, cfg.updateIntervalMs);
+  }
+
+  return { init, refreshDisplay };
+})();
+
+/* ═══════════════════════════════════════════════════════════
    MODULE: Modes
    Three swipeable screens in order: 0=weather, 1=shopping, 2=news
    Swiping wraps circularly. The moon button returns to screen 0.
@@ -874,8 +1129,8 @@ const ShoppingList = (() => {
 const Modes = (() => {
   let saverIndex = 0;
 
-  // Screen order: weather → shopping → news (circular)
-  const SAVER_ELS = () => [DOM.screensaver, DOM.shopping, DOM.news];
+  // Screen order: weather → shopping → news → climate (circular)
+  const SAVER_ELS = () => [DOM.screensaver, DOM.shopping, DOM.news, DOM.climate];
 
   function updateDots(idx) {
     const n = SAVER_ELS().length;
@@ -966,6 +1221,7 @@ const SwipeHandler = (() => {
   News.init();
   NewsPopup.init();
   ShoppingList.init();
+  Climate.init();
   SwipeHandler.init();
   Modes.initButton();
 })();

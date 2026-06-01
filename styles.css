@@ -1032,6 +1032,293 @@ html, body {
   box-shadow: inset 2px 2px 5px var(--neu-inset-dark), inset -2px -2px 5px var(--neu-inset-light);
 }
 
+/* ─── Climate (Room Sensor) screen ─────────────────────────── */
+#climate {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--charcoal);
+}
+
+.climate-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2.5vh;
+  padding: 7vh 5vw 13vh;
+  z-index: 1;
+  width: 100%;
+  max-width: 520px;
+  overflow-y: auto;
+  max-height: 100vh;
+  scrollbar-width: none;
+}
+.climate-content::-webkit-scrollbar { display: none; }
+
+/* Compact clock */
+.climate-clock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1;
+}
+
+.climate-time-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.35em;
+}
+
+.climate-time {
+  font-size: clamp(38px, 9vw, 88px);
+  font-weight: 200;
+  letter-spacing: -0.03em;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+  line-height: 1;
+}
+
+.climate-secs {
+  font-size: clamp(12px, 2.2vw, 22px);
+  font-weight: 300;
+  color: var(--gold);
+  letter-spacing: 0.13em;
+  padding-bottom: 0.22em;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+.climate-date {
+  font-size: clamp(11px, 1.8vw, 17px);
+  font-weight: 300;
+  color: var(--text-dim);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-top: 0.4em;
+}
+
+/* Current readings row */
+.climate-readings {
+  display: flex;
+  gap: 3vw;
+  justify-content: center;
+  width: 100%;
+}
+
+.climate-card {
+  flex: 1;
+  max-width: 200px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35em;
+  background: var(--charcoal);
+  border-radius: var(--radius);
+  padding: 2.5vh 3vw;
+  box-shadow:
+    6px 6px 16px var(--neu-dark),
+    -6px -6px 16px var(--neu-light);
+  animation: fadeUp 400ms ease both;
+}
+
+.climate-card-icon {
+  font-size: clamp(20px, 4vw, 34px);
+  line-height: 1;
+}
+
+.climate-value {
+  font-size: clamp(26px, 6vw, 50px);
+  font-weight: 200;
+  color: var(--text);
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+  line-height: 1;
+}
+
+.climate-card-label {
+  font-size: clamp(9px, 1.4vw, 12px);
+  color: var(--text-dim);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* Average block */
+.climate-avg-block {
+  background: var(--charcoal);
+  border-radius: var(--radius);
+  padding: 2vh 4vw;
+  box-shadow:
+    6px 6px 16px var(--neu-dark),
+    -6px -6px 16px var(--neu-light);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.2vh;
+  width: 100%;
+}
+
+.climate-avg-header {
+  display: flex;
+  align-items: center;
+  gap: 2.5vw;
+}
+
+.avg-period-label {
+  font-size: clamp(11px, 1.8vw, 15px);
+  font-weight: 600;
+  color: var(--text-dim);
+  letter-spacing: 0.12em;
+  min-width: 28px;
+  text-align: center;
+  transition: color 250ms ease;
+}
+
+.avg-period-label.active {
+  color: var(--gold);
+}
+
+/* Toggle switch */
+.toggle-switch {
+  width: 50px;
+  height: 26px;
+  border-radius: 13px;
+  background: var(--charcoal);
+  box-shadow:
+    inset 3px 3px 7px var(--neu-inset-dark),
+    inset -3px -3px 7px var(--neu-inset-light);
+  position: relative;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.toggle-knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--gold-dim);
+  box-shadow: 2px 2px 5px var(--neu-dark);
+  transition: transform 300ms cubic-bezier(0.34, 1.36, 0.64, 1), background 250ms ease;
+}
+
+.toggle-switch.on .toggle-knob {
+  transform: translateX(24px);
+  background: var(--gold);
+}
+
+.climate-avg-row {
+  display: flex;
+  align-items: center;
+  gap: 1.5vw;
+}
+
+.avg-icon { font-size: clamp(13px, 2.2vw, 18px); }
+
+.climate-avg-value {
+  font-size: clamp(18px, 3.5vw, 30px);
+  font-weight: 300;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+.avg-sep {
+  color: var(--text-dim);
+  opacity: 0.35;
+  font-size: clamp(16px, 3vw, 24px);
+  padding: 0 0.4vw;
+}
+
+/* Air quality block */
+.climate-aq-block {
+  background: var(--charcoal);
+  border-radius: var(--radius);
+  padding: 2vh 4vw;
+  box-shadow:
+    6px 6px 16px var(--neu-dark),
+    -6px -6px 16px var(--neu-light);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 2vw;
+}
+
+.climate-aq-left {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5em;
+}
+
+.climate-aq-label {
+  font-size: clamp(10px, 1.6vw, 13px);
+  color: var(--text-dim);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.climate-aq-rating {
+  display: flex;
+  align-items: center;
+  gap: 0.7em;
+}
+
+.aq-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition: background 400ms ease, box-shadow 400ms ease;
+}
+
+.aq-dot.aq-excellent { background: #5cb85c; box-shadow: 0 0 8px rgba(92,184,92,0.65); }
+.aq-dot.aq-good      { background: #9bc140; box-shadow: 0 0 8px rgba(155,193,64,0.55); }
+.aq-dot.aq-fair      { background: #d4a017; box-shadow: 0 0 8px rgba(212,160,23,0.55); }
+.aq-dot.aq-poor      { background: #e07030; box-shadow: 0 0 8px rgba(224,112,48,0.55); }
+.aq-dot.aq-very-poor { background: #d43030; box-shadow: 0 0 8px rgba(212,48,48,0.55); }
+
+.aq-text {
+  font-size: clamp(15px, 2.8vw, 26px);
+  font-weight: 300;
+  color: var(--text);
+  letter-spacing: 0.01em;
+}
+
+.climate-aq-right {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2em;
+  flex-shrink: 0;
+}
+
+.aq-emoji {
+  font-size: clamp(22px, 5vw, 40px);
+  line-height: 1;
+}
+
+.aq-score {
+  font-size: clamp(10px, 1.6vw, 13px);
+  color: var(--gold);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* Error state */
+.climate-error {
+  font-size: clamp(12px, 2vw, 15px);
+  color: var(--text-dim);
+  letter-spacing: 0.06em;
+  text-align: center;
+  opacity: 0.65;
+}
+
 /* ─── Light theme overrides ─────────────────────────────── */
 /* The CSS variable system handles most of the palette swap;
    these overrides handle things that can't be done with vars. */

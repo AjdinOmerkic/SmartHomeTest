@@ -60,6 +60,7 @@
       <div class="dot dot-active"></div>
       <div class="dot"></div>
       <div class="dot"></div>
+      <div class="dot"></div>
     </div>
 
   </div>
@@ -85,6 +86,7 @@
       <div class="dot"></div>
       <div class="dot"></div>
       <div class="dot dot-active"></div>
+      <div class="dot"></div>
     </div>
 
     <!-- Article detail popup (scoped inside #news so it fades with the screen) -->
@@ -150,6 +152,83 @@
       <div class="dot"></div>
       <div class="dot dot-active"></div>
       <div class="dot"></div>
+      <div class="dot"></div>
+    </div>
+
+  </div>
+
+  <!-- ═══════════════════════════════════════════════
+       SAVER SCREEN 3 — Room Climate
+  ════════════════════════════════════════════════ -->
+  <div id="climate" class="screen">
+
+    <div class="bg-blob blob-1"></div>
+    <div class="bg-blob blob-2"></div>
+    <div class="bg-blob blob-3"></div>
+
+    <div class="climate-content">
+
+      <div class="climate-clock">
+        <div class="climate-time-row">
+          <span id="climate-time" class="climate-time">00:00</span>
+          <span id="climate-secs" class="climate-secs">00</span>
+        </div>
+        <div id="climate-date" class="climate-date">Monday, January 1</div>
+      </div>
+
+      <div class="climate-readings">
+        <div class="climate-card">
+          <div class="climate-card-icon">🌡️</div>
+          <div id="climate-temp-val" class="climate-value">--.-°C</div>
+          <div id="climate-label-temp" class="climate-card-label">Temperature</div>
+        </div>
+        <div class="climate-card">
+          <div class="climate-card-icon">💧</div>
+          <div id="climate-hum-val" class="climate-value">---%</div>
+          <div id="climate-label-hum" class="climate-card-label">Humidity</div>
+        </div>
+      </div>
+
+      <div class="climate-avg-block">
+        <div class="climate-avg-header">
+          <span id="avg-label-24h" class="avg-period-label active">24H</span>
+          <div id="avg-toggle" class="toggle-switch" role="switch" aria-checked="false">
+            <div class="toggle-knob"></div>
+          </div>
+          <span id="avg-label-7d" class="avg-period-label">7D</span>
+        </div>
+        <div class="climate-avg-row">
+          <span class="avg-icon">🌡️</span>
+          <span id="climate-avg-temp" class="climate-avg-value">--.-°C</span>
+          <span class="avg-sep">·</span>
+          <span class="avg-icon">💧</span>
+          <span id="climate-avg-hum" class="climate-avg-value">---%</span>
+        </div>
+      </div>
+
+      <div class="climate-aq-block">
+        <div class="climate-aq-left">
+          <span id="climate-label-aq" class="climate-aq-label">Air Quality</span>
+          <div class="climate-aq-rating">
+            <span id="climate-aq-dot" class="aq-dot"></span>
+            <span id="climate-aq-text" class="aq-text">—</span>
+          </div>
+        </div>
+        <div class="climate-aq-right">
+          <span id="climate-aq-emoji" class="aq-emoji">—</span>
+          <span id="climate-aq-score" class="aq-score">—</span>
+        </div>
+      </div>
+
+      <div id="climate-error" class="climate-error hidden">No sensor data</div>
+
+    </div>
+
+    <div class="saver-dots">
+      <div class="dot"></div>
+      <div class="dot"></div>
+      <div class="dot"></div>
+      <div class="dot dot-active"></div>
     </div>
 
   </div>
