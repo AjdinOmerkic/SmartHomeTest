@@ -12,7 +12,6 @@
  *                   supports add, long-press-select, delete selected, clear all
  *   Modes         — manages SAVER (clock/news sub-screens) ↔ SHOPPING transitions
  *   SwipeHandler  — horizontal swipe cycles saver sub-screens; tap opens shopping
- *   Inactivity    — drives auto-return to saver after idle timeout
  */
 
 'use strict';
@@ -21,9 +20,6 @@
    CONFIG — edit these values before deploying
 ═══════════════════════════════════════════════════════════ */
 const CONFIG = {
-
-  /* ── Inactivity ─────────────────────────────────────── */
-  inactivitySeconds: 15,
 
   /* ── Google Sheets (no API key required) ───────────── */
   sheets: {
@@ -51,9 +47,9 @@ const CONFIG = {
     updateIntervalMs: 600_000,   // refresh every 10 minutes
     maxItems: 12,
     sources: [
-      { label: 'Klix.ba',     rss: 'https://news.google.com/rss/search?q=site:klix.ba&hl=bs&gl=BA&ceid=BA:bs' },
+      { label: 'Klix.ba',     rss: 'https://news.google.com/rss/search?q=site:klix.ba+-posao&hl=bs&gl=BA&ceid=BA:bs' },
       { label: 'Oslobođenje', rss: 'https://news.google.com/rss/search?q=site:oslobodjenje.ba&hl=bs&gl=BA&ceid=BA:bs' },
-      { label: 'Avaz',        rss: 'https://news.google.com/rss/search?q=site:avaz.ba&hl=bs&gl=BA&ceid=BA:bs' },
+      { label: 'Avaz',        rss: 'https://news.google.com/rss/search?q=dnevni+avaz&hl=bs&gl=BA&ceid=BA:bs' },
     ],
   },
 
@@ -293,9 +289,17 @@ const DOM = {
   btnDeleteSel:    document.getElementById('btn-delete-sel'),
   btnCancelSel:    document.getElementById('btn-cancel-sel'),
   btnClearAll:     document.getElementById('btn-clear-all'),
-  // Return countdown bar
-  returnBar:       document.getElementById('return-bar'),
-  returnBarFill:   document.getElementById('return-bar-fill'),
+  // Cart buttons (saver screens)
+  btnCart0:          document.getElementById('btn-cart-0'),
+  btnCart1:          document.getElementById('btn-cart-1'),
+  // News popup
+  newsPopup:         document.getElementById('news-popup'),
+  newsPopupBackdrop: document.getElementById('news-popup-backdrop'),
+  newsPopupClose:    document.getElementById('news-popup-close'),
+  newsPopupSource:   document.getElementById('news-popup-source'),
+  newsPopupTitle:    document.getElementById('news-popup-title'),
+  newsPopupTime:     document.getElementById('news-popup-time'),
+  newsPopupLink:     document.getElementById('news-popup-link'),
   // Nav
   btnScreensaver:  document.getElementById('btn-screensaver'),
   // Language & theme
@@ -483,9 +487,11 @@ const News = (() => {
       // Strip " - Source Name" suffix Google News appends
       title = title.replace(/\s+-\s+[^-]+$/, '').trim();
 
-      const pubDate = el.querySelector('pubDate')?.textContent?.trim() || '';
-      const link    = el.querySelector('link')?.textContent?.trim() || '';
-      return { title, link, pubDate };
+      const pubDate    = el.querySelector('pubDate')?.textContent?.trim() || '';
+      const link       = el.querySelector('link')?.textContent?.trim() || '';
+      const sourceEl   = el.querySelector('source');
+      const sourceName = sourceEl?.textContent?.trim() || '';
+      return { title, link, pubDate, sourceName };
     }).filter(a => a.title);
   }
 
@@ -522,6 +528,7 @@ const News = (() => {
       item.innerHTML =
         '<div class="news-item-title">' + escHtml(a.title) + '</div>' +
         (time ? '<div class="news-item-time">' + time + '</div>' : '');
+      item.addEventListener('click', e => { e.stopPropagation(); NewsPopup.open(a); });
       frag.appendChild(item);
     });
 
@@ -586,7 +593,6 @@ const News = (() => {
       tab.addEventListener('click', e => {
         e.stopPropagation();
         switchSource(i);
-        Inactivity.reset();
       });
     });
 
@@ -595,6 +601,41 @@ const News = (() => {
   }
 
   return { init };
+})();
+
+/* ═══════════════════════════════════════════════════════════
+   MODULE: NewsPopup
+   Shows article details in a modal when a headline is tapped.
+═══════════════════════════════════════════════════════════ */
+const NewsPopup = (() => {
+  function formatDate(dateStr) {
+    if (!dateStr) return '';
+    try {
+      return new Date(dateStr).toLocaleString(I18n.getLang() === 'bs' ? 'bs-BA' : 'en-GB', {
+        day: 'numeric', month: 'long', year: 'numeric',
+        hour: '2-digit', minute: '2-digit',
+      });
+    } catch { return dateStr; }
+  }
+
+  function open(article) {
+    DOM.newsPopupSource.textContent = article.sourceName || '';
+    DOM.newsPopupTitle.textContent  = article.title;
+    DOM.newsPopupTime.textContent   = formatDate(article.pubDate);
+    DOM.newsPopupLink.href          = article.link || '#';
+    DOM.newsPopup.classList.remove('hidden');
+  }
+
+  function close() {
+    DOM.newsPopup.classList.add('hidden');
+  }
+
+  function init() {
+    DOM.newsPopupClose.addEventListener('click', e => { e.stopPropagation(); close(); });
+    DOM.newsPopupBackdrop.addEventListener('click', close);
+  }
+
+  return { init, open, close };
 })();
 
 /* ═══════════════════════════════════════════════════════════
@@ -661,7 +702,6 @@ const ShoppingList = (() => {
     selected.clear();
     selected.add(firstId);
     DOM.selectionBar.classList.remove('hidden');
-    DOM.returnBar.classList.add('hidden');
     render();
     updateSelBar();
   }
@@ -670,7 +710,6 @@ const ShoppingList = (() => {
     inSel = false;
     selected.clear();
     DOM.selectionBar.classList.add('hidden');
-    DOM.returnBar.classList.remove('hidden');
     render();
   }
 
@@ -906,7 +945,6 @@ const Modes = (() => {
     current = 'saver';
     DOM.shopping.classList.remove('active');
     showSaver(saverIndex);
-    Inactivity.stopCountdown();
     ShoppingList.exitSelectionMode();
   }
 
@@ -928,6 +966,8 @@ const Modes = (() => {
       e.stopPropagation();
       activateScreensaver();
     });
+    DOM.btnCart0.addEventListener('click', e => { e.stopPropagation(); activateShopping(); });
+    DOM.btnCart1.addEventListener('click', e => { e.stopPropagation(); activateShopping(); });
   }
 
   return {
@@ -976,14 +1016,12 @@ const SwipeHandler = (() => {
       if (isHSwipe) {
         // swipe left (dx < 0) → next screen; swipe right (dx > 0) → prev screen
         Modes.switchSaver(dx < 0 ? 1 : -1);
-        Inactivity.reset();
       } else if (isTap && Modes.getSaverIndex() === 0) {
         // Only the clock/weather screen (index 0) opens shopping on tap.
         // The news screen (index 1) is read-only — touches scroll the feed.
         const target = e.target;
         if (target.closest('button, a, input, select')) return;
         Modes.activateShopping();
-        Inactivity.reset();
       }
     }, { passive: true });
 
@@ -993,71 +1031,12 @@ const SwipeHandler = (() => {
       if (Modes.getSaverIndex() !== 0) return;
       if (e.target.closest('button, a, input, select')) return;
       Modes.activateShopping();
-      Inactivity.reset();
     });
   }
 
   return { init };
 })();
 
-/* ═══════════════════════════════════════════════════════════
-   MODULE: Inactivity
-   Resets timer on any interaction.
-   After timeout while in shopping mode → return to saver.
-═══════════════════════════════════════════════════════════ */
-const Inactivity = (() => {
-  const TIMEOUT_MS = CONFIG.inactivitySeconds * 1000;
-  let   timer      = null;
-  let   barTimer   = null;
-  let   barStart   = 0;
-
-  function animateBar() {
-    const elapsed  = Date.now() - barStart;
-    const fraction = Math.max(0, 1 - elapsed / TIMEOUT_MS);
-    DOM.returnBarFill.style.transform = 'scaleX(' + fraction + ')';
-    if (fraction > 0) {
-      barTimer = requestAnimationFrame(animateBar);
-    }
-  }
-
-  function startCountdown() {
-    if (Modes.getCurrent() !== 'shopping') return;
-    barStart = Date.now();
-    if (barTimer) cancelAnimationFrame(barTimer);
-    barTimer = requestAnimationFrame(animateBar);
-  }
-
-  function stopCountdown() {
-    if (barTimer) {
-      cancelAnimationFrame(barTimer);
-      barTimer = null;
-    }
-    DOM.returnBarFill.style.transform = 'scaleX(1)';
-  }
-
-  function reset() {
-    clearTimeout(timer);
-    if (Modes.getCurrent() === 'shopping') {
-      startCountdown();
-    }
-    timer = setTimeout(() => {
-      Modes.activateScreensaver();
-    }, TIMEOUT_MS);
-  }
-
-  function init() {
-    // Reset inactivity timer on any interaction.
-    // SwipeHandler handles mode switching for saver screens — we only track activity here.
-    const EVENTS = ['touchstart', 'touchmove', 'mousedown', 'mousemove', 'keydown', 'scroll'];
-    EVENTS.forEach(evt => {
-      document.addEventListener(evt, reset, { passive: true });
-    });
-
-    reset();
-  }
-
-  return { init, stopCountdown, reset };
-})();
 
 /* ═══════════════════════════════════════════════════════════
    BOOT
@@ -1068,8 +1047,8 @@ const Inactivity = (() => {
   Clock.init();
   Weather.init();
   News.init();
+  NewsPopup.init();
   ShoppingList.init();
   SwipeHandler.init();
-  Inactivity.init();
   Modes.initButton();
 })();

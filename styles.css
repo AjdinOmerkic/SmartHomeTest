@@ -546,27 +546,6 @@ html, body {
   font-style: italic;
 }
 
-/* ─── Return countdown bar ──────────────────────────────── */
-.return-bar {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: rgba(255, 255, 255, 0.05);
-  z-index: 10;
-  overflow: hidden;
-}
-
-.return-bar-fill {
-  height: 100%;
-  width: 100%;
-  background: linear-gradient(90deg, var(--forest), var(--gold));
-  transform-origin: left;
-  transform: scaleX(1);
-  transition: transform 1s linear;
-  will-change: transform;
-}
 
 /* ─── Utility ────────────────────────────────────────────── */
 .hidden { display: none !important; }
@@ -893,6 +872,13 @@ html, body {
   z-index: 2;
 }
 
+.news-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2vw;
+}
+
 .news-tabs {
   display: flex;
   gap: 2vw;
@@ -981,6 +967,108 @@ html, body {
   letter-spacing: 0.06em;
 }
 
+/* ─── Cart button accent ────────────────────────────────── */
+.saver-btn-cart {
+  color: var(--gold);
+  font-size: clamp(14px, 2.4vw, 18px);
+}
+
+/* ─── News article popup ────────────────────────────────── */
+.news-popup {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4vw;
+}
+
+.news-popup-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.news-popup-card {
+  position: relative;
+  background: var(--charcoal);
+  border-radius: var(--radius);
+  padding: 4vh 4vw;
+  max-width: 680px;
+  width: 100%;
+  box-shadow:
+    10px 10px 28px var(--neu-dark),
+    -10px -10px 28px var(--neu-light);
+  animation: popupIn 240ms cubic-bezier(0.34, 1.36, 0.64, 1);
+}
+
+@keyframes popupIn {
+  from { opacity: 0; transform: scale(0.93); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.news-popup-close {
+  position: absolute;
+  top: 2vh;
+  right: 2.5vw;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: none;
+  background: var(--charcoal);
+  color: var(--text-dim);
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 3px 3px 7px var(--neu-dark), -3px -3px 7px var(--neu-light);
+}
+
+.news-popup-source {
+  font-size: clamp(10px, 1.5vw, 13px);
+  color: var(--gold);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 600;
+  margin-bottom: 1vh;
+}
+
+.news-popup-title {
+  font-size: clamp(18px, 3vw, 28px);
+  font-weight: 400;
+  color: var(--text);
+  line-height: 1.4;
+  margin-bottom: 1.5vh;
+  padding-right: 3vw;
+}
+
+.news-popup-time {
+  font-size: clamp(12px, 1.8vw, 15px);
+  color: var(--text-dim);
+  letter-spacing: 0.04em;
+  margin-bottom: 3vh;
+}
+
+.news-popup-link {
+  display: inline-block;
+  color: var(--olive);
+  font-size: clamp(13px, 2vw, 16px);
+  font-weight: 500;
+  text-decoration: none;
+  letter-spacing: 0.04em;
+  padding: 0.55em 1.4em;
+  border-radius: 50px;
+  box-shadow: 3px 3px 8px var(--neu-dark), -3px -3px 8px var(--neu-light);
+}
+
+.news-popup-link:active {
+  box-shadow: inset 2px 2px 5px var(--neu-inset-dark), inset -2px -2px 5px var(--neu-inset-light);
+}
+
 /* ─── Light theme overrides ─────────────────────────────── */
 /* The CSS variable system handles most of the palette swap;
    these overrides handle things that can't be done with vars. */
@@ -1005,11 +1093,6 @@ html, body {
 [data-theme="light"] .card-bullet {
   background: var(--olive);
   box-shadow: 0 0 6px rgba(107, 122, 48, 0.35);
-}
-
-[data-theme="light"] .return-bar { background: rgba(0,0,0,0.08); }
-[data-theme="light"] .return-bar-fill {
-  background: linear-gradient(90deg, var(--forest), var(--olive));
 }
 
 [data-theme="light"] .sel-delete {

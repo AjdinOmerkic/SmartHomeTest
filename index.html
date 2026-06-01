@@ -21,8 +21,10 @@
     <div class="bg-blob blob-2"></div>
     <div class="bg-blob blob-3"></div>
 
+    <!-- Lang · Cart · Theme -->
     <div class="saver-controls">
       <button id="btn-lang-saver" class="saver-btn" aria-label="Switch language">BS</button>
+      <button id="btn-cart-0"     class="saver-btn saver-btn-cart" aria-label="Shopping list">🛒</button>
       <button id="btn-theme"      class="saver-btn" aria-label="Switch theme">☀️</button>
     </div>
 
@@ -53,7 +55,7 @@
 
     </div>
 
-    <div id="tap-hint" class="tap-hint">Tap anywhere · Swipe for news</div>
+    <div id="tap-hint" class="tap-hint">Swipe for news</div>
 
     <div class="saver-dots">
       <div class="dot dot-active"></div>
@@ -72,10 +74,13 @@
     <div class="bg-blob blob-3"></div>
 
     <div class="news-header">
-      <div id="news-tabs" class="news-tabs">
-        <button class="news-tab active" data-src="0">Klix.ba</button>
-        <button class="news-tab"        data-src="1">Oslobođenje</button>
-        <button class="news-tab"        data-src="2">Avaz</button>
+      <div class="news-header-row">
+        <div id="news-tabs" class="news-tabs">
+          <button class="news-tab active" data-src="0">Klix.ba</button>
+          <button class="news-tab"        data-src="1">Oslobođenje</button>
+          <button class="news-tab"        data-src="2">Avaz</button>
+        </div>
+        <button id="btn-cart-1" class="saver-btn saver-btn-cart" aria-label="Shopping list">🛒</button>
       </div>
       <div id="news-updated" class="news-updated"></div>
     </div>
@@ -87,6 +92,20 @@
     <div class="saver-dots">
       <div class="dot"></div>
       <div class="dot dot-active"></div>
+    </div>
+
+    <!-- Article detail popup (scoped inside #news so it fades with the screen) -->
+    <div id="news-popup" class="news-popup hidden">
+      <div id="news-popup-backdrop" class="news-popup-backdrop"></div>
+      <div class="news-popup-card">
+        <button id="news-popup-close" class="news-popup-close" aria-label="Close">✕</button>
+        <div id="news-popup-source" class="news-popup-source"></div>
+        <div id="news-popup-title"  class="news-popup-title"></div>
+        <div id="news-popup-time"   class="news-popup-time"></div>
+        <a   id="news-popup-link"   class="news-popup-link" target="_blank" rel="noopener noreferrer">
+          Read full article →
+        </a>
+      </div>
     </div>
 
   </div>
@@ -132,10 +151,6 @@
       <span   id="sel-count"      class="sel-count">0 selected</span>
       <button id="btn-delete-sel" class="sel-btn sel-delete" disabled>Delete</button>
       <button id="btn-clear-all"  class="sel-btn sel-danger">Clear All</button>
-    </div>
-
-    <div id="return-bar" class="return-bar">
-      <div id="return-bar-fill" class="return-bar-fill"></div>
     </div>
 
   </div>
