@@ -745,7 +745,7 @@ const ShoppingList = (() => {
   let dirty         = false; // true when local state has unconfirmed writes
 
   function hasScript() {
-    return cfg.scriptUrl && cfg.scriptUrl !== 'https://script.google.com/macros/s/AKfycbzAvTyvsy03JKqLs2j1ojCttBtrf9LADNz1NAstI-q-8xcGMwQMHhqxn0J_LSUsUW6l/exec';
+    return cfg.scriptUrl && cfg.scriptUrl !== 'YOUR_APPS_SCRIPT_URL';
   }
 
   async function sheetRead() {
