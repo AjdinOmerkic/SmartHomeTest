@@ -37,11 +37,16 @@
 
       <div class="weather-block">
         <div class="weather-current">
-          <span id="weather-icon" class="weather-icon">—</span>
-          <div class="weather-temp-block">
-            <span id="weather-temp" class="weather-temp">--°</span>
-            <span id="weather-desc" class="weather-desc">Loading…</span>
-            <span id="weather-hilo" class="weather-hilo">H: --° · L: --°</span>
+          <div class="weather-current-main">
+            <span id="weather-icon" class="weather-icon">—</span>
+            <div class="weather-temp-block">
+              <span id="weather-temp" class="weather-temp">--°</span>
+              <span id="weather-desc" class="weather-desc">Loading…</span>
+              <span id="weather-hilo" class="weather-hilo">H: --° · L: --°</span>
+            </div>
+          </div>
+          <div id="weather-detail" class="weather-detail">
+            <div id="weather-detail-grid" class="weather-detail-grid"></div>
           </div>
         </div>
 
@@ -176,51 +181,55 @@
         <div id="climate-date" class="climate-date">Monday, January 1</div>
       </div>
 
-      <div class="climate-readings">
-        <div class="climate-card">
-          <div class="climate-card-icon">🌡️</div>
-          <div id="climate-temp-val" class="climate-value">--.-°C</div>
-          <div id="climate-label-temp" class="climate-card-label">Temperature</div>
-        </div>
-        <div class="climate-card">
-          <div class="climate-card-icon">💧</div>
-          <div id="climate-hum-val" class="climate-value">---%</div>
-          <div id="climate-label-hum" class="climate-card-label">Humidity</div>
-        </div>
-      </div>
+      <div class="climate-right">
 
-      <div class="climate-avg-block">
-        <div class="climate-avg-header">
-          <span id="avg-label-24h" class="avg-period-label active">24H</span>
-          <div id="avg-toggle" class="toggle-switch" role="switch" aria-checked="false">
-            <div class="toggle-knob"></div>
+        <div class="climate-readings">
+          <div class="climate-card">
+            <div class="climate-card-icon">🌡️</div>
+            <div id="climate-temp-val" class="climate-value">--.-°C</div>
+            <div id="climate-label-temp" class="climate-card-label">Temperature</div>
           </div>
-          <span id="avg-label-7d" class="avg-period-label">7D</span>
-        </div>
-        <div class="climate-avg-row">
-          <span class="avg-icon">🌡️</span>
-          <span id="climate-avg-temp" class="climate-avg-value">--.-°C</span>
-          <span class="avg-sep">·</span>
-          <span class="avg-icon">💧</span>
-          <span id="climate-avg-hum" class="climate-avg-value">---%</span>
-        </div>
-      </div>
-
-      <div class="climate-aq-block">
-        <div class="climate-aq-left">
-          <span id="climate-label-aq" class="climate-aq-label">Air Quality</span>
-          <div class="climate-aq-rating">
-            <span id="climate-aq-dot" class="aq-dot"></span>
-            <span id="climate-aq-text" class="aq-text">—</span>
+          <div class="climate-card">
+            <div class="climate-card-icon">💧</div>
+            <div id="climate-hum-val" class="climate-value">---%</div>
+            <div id="climate-label-hum" class="climate-card-label">Humidity</div>
           </div>
         </div>
-        <div class="climate-aq-right">
-          <span id="climate-aq-emoji" class="aq-emoji">—</span>
-          <span id="climate-aq-score" class="aq-score">—</span>
-        </div>
-      </div>
 
-      <div id="climate-error" class="climate-error hidden">No sensor data</div>
+        <div class="climate-avg-block">
+          <div class="climate-avg-header">
+            <span id="avg-label-24h" class="avg-period-label active">24H</span>
+            <div id="avg-toggle" class="toggle-switch" role="switch" aria-checked="false">
+              <div class="toggle-knob"></div>
+            </div>
+            <span id="avg-label-7d" class="avg-period-label">7D</span>
+          </div>
+          <div class="climate-avg-row">
+            <span class="avg-icon">🌡️</span>
+            <span id="climate-avg-temp" class="climate-avg-value">--.-°C</span>
+            <span class="avg-sep">·</span>
+            <span class="avg-icon">💧</span>
+            <span id="climate-avg-hum" class="climate-avg-value">---%</span>
+          </div>
+        </div>
+
+        <div class="climate-aq-block">
+          <div class="climate-aq-left">
+            <span id="climate-label-aq" class="climate-aq-label">Air Quality</span>
+            <div class="climate-aq-rating">
+              <span id="climate-aq-dot" class="aq-dot"></span>
+              <span id="climate-aq-text" class="aq-text">—</span>
+            </div>
+          </div>
+          <div class="climate-aq-right">
+            <span id="climate-aq-emoji" class="aq-emoji">—</span>
+            <span id="climate-aq-score" class="aq-score">—</span>
+          </div>
+        </div>
+
+        <div id="climate-error" class="climate-error hidden">No sensor data</div>
+
+      </div>
 
     </div>
 

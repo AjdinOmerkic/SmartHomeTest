@@ -411,7 +411,12 @@ const Clock = (() => {
 ═══════════════════════════════════════════════════════════ */
 const Weather = (() => {
   const cfg = CONFIG.weather;
-  let lastCode = null;
+  let lastCode    = null;
+  let lastWind    = null;
+  let lastWindDir = null;
+  let lastPrecip  = null;
+  let lastUV      = null;
+  let isExpanded  = false;
 
   function fmt(temp) { return Math.round(temp) + '°C'; }
 
@@ -422,6 +427,31 @@ const Weather = (() => {
 
   function refreshDesc() {
     if (lastCode !== null) DOM.weatherDesc.textContent = wmoDesc(lastCode);
+  }
+
+  function degreesToCompass(deg) {
+    const dirs = ['N','NE','E','SE','S','SW','W','NW'];
+    return dirs[Math.round(((deg % 360) + 360) % 360 / 45) % 8];
+  }
+
+  function renderDetail() {
+    const grid = document.getElementById('weather-detail-grid');
+    if (!grid) return;
+    const windSpd = lastWind    !== null ? Math.round(lastWind) + ' km/h'   : '—';
+    const windDir = lastWindDir !== null ? degreesToCompass(lastWindDir)     : '—';
+    const precip  = lastPrecip  !== null ? lastPrecip.toFixed(1) + ' mm'    : '—';
+    const uv      = lastUV      !== null ? lastUV.toFixed(1)                 : '—';
+    grid.innerHTML =
+      '<div class="weather-stat-pill"><span class="weather-stat-icon">💨</span><span class="weather-stat-value">' + escHtml(windSpd) + '</span><span class="weather-stat-label">Wind</span></div>' +
+      '<div class="weather-stat-pill"><span class="weather-stat-icon">🧭</span><span class="weather-stat-value">' + escHtml(windDir) + '</span><span class="weather-stat-label">Direction</span></div>' +
+      '<div class="weather-stat-pill"><span class="weather-stat-icon">🌧️</span><span class="weather-stat-value">' + escHtml(precip) + '</span><span class="weather-stat-label">Precip.</span></div>' +
+      '<div class="weather-stat-pill"><span class="weather-stat-icon">☀️</span><span class="weather-stat-value">' + escHtml(uv) + '</span><span class="weather-stat-label">UV Index</span></div>';
+  }
+
+  function collapseDetail() {
+    const card = document.querySelector('.weather-current');
+    if (card) card.classList.remove('expanded');
+    isExpanded = false;
   }
 
   function render(data) {
@@ -453,6 +483,12 @@ const Weather = (() => {
     }
     DOM.weatherForecast.innerHTML = '';
     DOM.weatherForecast.appendChild(frag);
+
+    lastWind    = cur.wind_speed_10m     != null ? cur.wind_speed_10m     : null;
+    lastWindDir = cur.wind_direction_10m != null ? cur.wind_direction_10m : null;
+    lastPrecip  = cur.precipitation      != null ? cur.precipitation      : null;
+    lastUV      = cur.uv_index           != null ? cur.uv_index           : null;
+    renderDetail();
   }
 
   async function fetchWeather() {
@@ -461,7 +497,7 @@ const Weather = (() => {
       'https://api.open-meteo.com/v1/forecast' +
       '?latitude='  + latitude +
       '&longitude=' + longitude +
-      '&current=temperature_2m,weather_code' +
+      '&current=temperature_2m,weather_code,wind_speed_10m,wind_direction_10m,precipitation,uv_index' +
       '&daily=weather_code,temperature_2m_max,temperature_2m_min' +
       '&timezone=auto' +
       '&forecast_days=5';
@@ -478,9 +514,17 @@ const Weather = (() => {
   function init() {
     fetchWeather();
     setInterval(fetchWeather, cfg.updateIntervalMs);
+    const weatherCard = document.querySelector('.weather-current');
+    if (weatherCard) {
+      weatherCard.addEventListener('click', function(e) {
+        e.stopPropagation();
+        isExpanded = !isExpanded;
+        weatherCard.classList.toggle('expanded', isExpanded);
+      });
+    }
   }
 
-  return { init, refreshDesc };
+  return { init, refreshDesc, collapseDetail };
 })();
 
 /* ═══════════════════════════════════════════════════════════
@@ -1145,6 +1189,7 @@ const Modes = (() => {
     saverIndex = idx;
     updateDots(idx);
     DOM.tapHint.classList.toggle('hidden', idx !== 0);
+    Weather.collapseDetail();
     if (idx === 1) {
       DOM.shoppingList.scrollTop = 0;
       ShoppingList.syncFromSheet();
