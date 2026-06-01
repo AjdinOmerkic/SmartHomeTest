@@ -144,7 +144,21 @@
       <div id="shopping-error-text" class="error-text">Could not load list</div>
     </div>
 
-    <button id="btn-add" class="btn-add" aria-label="Add item">+</button>
+    <button id="btn-add"   class="btn-add"       aria-label="Add item">+</button>
+    <button id="btn-quick" class="btn-quick-fab" aria-label="Quick add">★</button>
+
+    <div id="quick-pick-backdrop" class="quick-pick-backdrop hidden"></div>
+    <div id="quick-pick-popup" class="quick-pick-popup hidden">
+      <div class="quick-pick-header">
+        <span class="quick-pick-title">Quick Add</span>
+        <button id="btn-quick-close" class="btn-quick-close" aria-label="Close">✕</button>
+      </div>
+      <div id="quick-pick-list" class="quick-pick-list"></div>
+      <div class="quick-pick-footer">
+        <button id="btn-quick-cancel"  class="btn-quick-cancel">Cancel</button>
+        <button id="btn-quick-confirm" class="btn-quick-confirm" disabled>Add</button>
+      </div>
+    </div>
 
     <div id="selection-bar" class="selection-bar hidden">
       <button id="btn-cancel-sel" class="sel-btn sel-cancel">Cancel</button>

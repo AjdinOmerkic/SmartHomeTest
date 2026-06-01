@@ -330,6 +330,14 @@ const DOM = {
   btnDeleteSel:    document.getElementById('btn-delete-sel'),
   btnCancelSel:    document.getElementById('btn-cancel-sel'),
   btnClearAll:     document.getElementById('btn-clear-all'),
+  // Quick-pick popup
+  btnQuick:          document.getElementById('btn-quick'),
+  quickPickBackdrop: document.getElementById('quick-pick-backdrop'),
+  quickPickPopup:    document.getElementById('quick-pick-popup'),
+  quickPickList:     document.getElementById('quick-pick-list'),
+  btnQuickClose:     document.getElementById('btn-quick-close'),
+  btnQuickCancel:    document.getElementById('btn-quick-cancel'),
+  btnQuickConfirm:   document.getElementById('btn-quick-confirm'),
   // News popup
   newsPopup:         document.getElementById('news-popup'),
   newsPopupBackdrop: document.getElementById('news-popup-backdrop'),
@@ -716,12 +724,24 @@ const NewsPopup = (() => {
 /* ═══════════════════════════════════════════════════════════
    MODULE: ShoppingList
 ═══════════════════════════════════════════════════════════ */
+const QUICK_ITEMS = [
+  'Ulje', 'Brašno', 'Šećer', 'Kafa',
+  'Pistacija grčki jogurt', 'Vanilla grčki jogurt',
+  'Piletina', 'Sir Gauda', 'Zrnasti sir',
+  'Zelena salata', 'Luk', 'Krompir', 'Mrkva', 'Bijeli luk',
+  'Kečap', 'Majoneza', 'Ovako šunka', 'Jaja', 'Limun', 'Hljeb',
+  'Tortilje', 'So', 'Vegeta',
+  'Proteinske čokoladice', 'Rocky Rice', 'Coca-Cola Zero',
+  'Breskvica', 'Kese za smeće', 'Kese za zamrzivač',
+].sort((a, b) => a.localeCompare(b, 'bs', { sensitivity: 'base' }));
+
 const ShoppingList = (() => {
   const cfg = CONFIG.sheets;
 
   let items    = [];
   let selected = new Set();
   let inSel    = false;
+  let quickSelected = new Set();
 
   function hasScript() {
     return cfg.scriptUrl && cfg.scriptUrl !== 'YOUR_APPS_SCRIPT_URL';
@@ -735,7 +755,7 @@ const ShoppingList = (() => {
     return data.items.map(text => ({ id: uid(), text }));
   }
 
-  function sheetWrite(action, params) {
+  async function sheetWrite(action, params) {
     if (!hasScript()) return;
     let url = cfg.scriptUrl + '?action=' + action;
     if (params) {
@@ -746,30 +766,46 @@ const ShoppingList = (() => {
         url += '&' + k + '=' + encodeURIComponent(v);
       });
     }
-    fetch(url).catch(err => console.warn('[ShoppingList] write failed:', err.message));
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
   }
 
-  function addItem(text) {
+  async function addItem(text) {
     const t = text.trim();
     if (!t) return;
     items.unshift({ id: uid(), text: t });
     Storage.save(items);
-    sheetWrite('add', { item: t });
     render();
+    try {
+      await sheetWrite('add', { item: t });
+      await syncFromSheet();
+    } catch (err) {
+      console.warn('[ShoppingList] add failed:', err.message);
+    }
   }
 
-  function removeSelected() {
+  async function removeSelected() {
     items = items.filter(item => !selected.has(item.id));
     Storage.save(items);
-    sheetWrite('sync', { items: items.map(i => i.text) });
     exitSelectionMode();
+    try {
+      await sheetWrite('sync', { items: items.map(i => i.text) });
+      await syncFromSheet();
+    } catch (err) {
+      console.warn('[ShoppingList] remove failed:', err.message);
+    }
   }
 
-  function clearAll() {
+  async function clearAll() {
     items = [];
     Storage.save(items);
-    sheetWrite('clear');
     exitSelectionMode();
+    try {
+      await sheetWrite('clear');
+      await syncFromSheet();
+    } catch (err) {
+      console.warn('[ShoppingList] clear failed:', err.message);
+    }
   }
 
   function enterSelectionMode(firstId) {
@@ -863,9 +899,84 @@ const ShoppingList = (() => {
     DOM.shoppingList.appendChild(frag);
   }
 
+  async function addItemsBatch(texts) {
+    const toAdd = texts.filter(t => t.trim());
+    if (!toAdd.length) return;
+    toAdd.forEach(t => items.unshift({ id: uid(), text: t.trim() }));
+    Storage.save(items);
+    render();
+    try {
+      for (const t of toAdd) await sheetWrite('add', { item: t });
+      await syncFromSheet();
+    } catch (err) {
+      console.warn('[ShoppingList] batch add failed:', err.message);
+    }
+  }
+
+  function showQuickPick() {
+    quickSelected.clear();
+    renderQuickPick();
+    DOM.quickPickBackdrop.classList.remove('hidden');
+    DOM.quickPickPopup.classList.remove('hidden');
+  }
+
+  function hideQuickPick() {
+    DOM.quickPickBackdrop.classList.add('hidden');
+    DOM.quickPickPopup.classList.add('hidden');
+    quickSelected.clear();
+  }
+
+  function renderQuickPick() {
+    const frag = document.createDocumentFragment();
+    QUICK_ITEMS.forEach(text => {
+      const row = document.createElement('div');
+      row.className = 'quick-pick-item' + (quickSelected.has(text) ? ' selected' : '');
+
+      const bullet = document.createElement('div');
+      bullet.className = 'quick-pick-item-bullet';
+
+      const label = document.createElement('div');
+      label.className = 'quick-pick-item-text';
+      label.textContent = text;
+
+      const check = document.createElement('div');
+      check.className = 'quick-pick-item-check';
+      check.textContent = '✓';
+
+      row.appendChild(bullet);
+      row.appendChild(label);
+      row.appendChild(check);
+
+      row.addEventListener('click', () => {
+        if (quickSelected.has(text)) { quickSelected.delete(text); }
+        else                         { quickSelected.add(text);    }
+        row.classList.toggle('selected', quickSelected.has(text));
+        updateQuickFooter();
+      });
+
+      frag.appendChild(row);
+    });
+    DOM.quickPickList.innerHTML = '';
+    DOM.quickPickList.appendChild(frag);
+    updateQuickFooter();
+  }
+
+  function updateQuickFooter() {
+    const n = quickSelected.size;
+    DOM.btnQuickConfirm.disabled = (n === 0);
+    DOM.btnQuickConfirm.textContent = n > 0 ? 'Add ' + n : 'Add';
+  }
+
+  async function confirmQuickPick() {
+    const toAdd = [...quickSelected];
+    hideQuickPick();
+    await addItemsBatch(toAdd);
+  }
+
   function showAddForm() {
     DOM.addForm.classList.remove('hidden');
     DOM.btnAdd.style.visibility = 'hidden';
+    DOM.btnQuick.style.visibility = 'hidden';
     DOM.addInput.value = '';
     setTimeout(() => DOM.addInput.focus(), 60);
   }
@@ -873,6 +984,7 @@ const ShoppingList = (() => {
   function hideAddForm() {
     DOM.addForm.classList.add('hidden');
     DOM.btnAdd.style.visibility = '';
+    DOM.btnQuick.style.visibility = '';
     DOM.addInput.blur();
   }
 
@@ -944,14 +1056,18 @@ const ShoppingList = (() => {
           typeof item === 'string' ? { id: uid(), text: item } : item
         );
         render();
-      } else {
-        seedFromCsv();
       }
+      seedFromCsv(); // always re-read; sheet is authoritative
     }
 
-    DOM.btnAdd.addEventListener('click',       e => { e.stopPropagation(); showAddForm();  });
-    DOM.btnAddConfirm.addEventListener('click', e => { e.stopPropagation(); confirmAdd();  });
-    DOM.btnAddCancel.addEventListener('click',  e => { e.stopPropagation(); hideAddForm(); });
+    DOM.btnAdd.addEventListener('click',       e => { e.stopPropagation(); showAddForm();    });
+    DOM.btnAddConfirm.addEventListener('click', e => { e.stopPropagation(); confirmAdd();    });
+    DOM.btnAddCancel.addEventListener('click',  e => { e.stopPropagation(); hideAddForm();   });
+    DOM.btnQuick.addEventListener('click',      e => { e.stopPropagation(); showQuickPick(); });
+    DOM.btnQuickClose.addEventListener('click',   e => { e.stopPropagation(); hideQuickPick();    });
+    DOM.btnQuickCancel.addEventListener('click',  e => { e.stopPropagation(); hideQuickPick();    });
+    DOM.btnQuickConfirm.addEventListener('click', e => { e.stopPropagation(); confirmQuickPick(); });
+    DOM.quickPickBackdrop.addEventListener('click', hideQuickPick);
     DOM.addInput.addEventListener('keydown', e => {
       if (e.key === 'Enter')  { e.preventDefault(); confirmAdd(); }
       if (e.key === 'Escape') { hideAddForm(); }
@@ -976,7 +1092,12 @@ const ShoppingList = (() => {
     });
   }
 
-  return { init, exitSelectionMode, syncFromSheet };
+  function sync() {
+    if (hasScript()) syncFromSheet();
+    else             seedFromCsv();
+  }
+
+  return { init, exitSelectionMode, syncFromSheet, sync };
 })();
 
 /* ═══════════════════════════════════════════════════════════
@@ -1192,7 +1313,7 @@ const Modes = (() => {
     Weather.collapseDetail();
     if (idx === 1) {
       DOM.shoppingList.scrollTop = 0;
-      ShoppingList.syncFromSheet();
+      ShoppingList.sync();
     }
   }
 
