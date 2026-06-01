@@ -284,9 +284,6 @@ const DOM = {
   btnDeleteSel:    document.getElementById('btn-delete-sel'),
   btnCancelSel:    document.getElementById('btn-cancel-sel'),
   btnClearAll:     document.getElementById('btn-clear-all'),
-  // Cart buttons (saver screens)
-  btnCart0:          document.getElementById('btn-cart-0'),
-  btnCart1:          document.getElementById('btn-cart-1'),
   // News popup
   newsPopup:         document.getElementById('news-popup'),
   newsPopupBackdrop: document.getElementById('news-popup-backdrop'),
@@ -871,18 +868,15 @@ const ShoppingList = (() => {
 
 /* ═══════════════════════════════════════════════════════════
    MODULE: Modes
-   current: 'saver' | 'shopping'
-   saverIndex: 0 = clock+weather, 1 = news
+   Three swipeable screens in order: 0=weather, 1=shopping, 2=news
+   Swiping wraps circularly. The moon button returns to screen 0.
 ═══════════════════════════════════════════════════════════ */
 const Modes = (() => {
-  let current    = 'saver';
   let saverIndex = 0;
 
-  const SAVER_ELS = () => [DOM.screensaver, DOM.news];
+  // Screen order: weather → shopping → news (circular)
+  const SAVER_ELS = () => [DOM.screensaver, DOM.shopping, DOM.news];
 
-  // Update dot indicators across all saver screens.
-  // Each .saver-dots container has one dot per screen in order, so
-  // dot position within its container = i % numScreens.
   function updateDots(idx) {
     const n = SAVER_ELS().length;
     document.querySelectorAll('.saver-dots .dot').forEach((dot, i) => {
@@ -890,15 +884,18 @@ const Modes = (() => {
     });
   }
 
-  // Show a specific saver sub-screen
   function showSaver(idx) {
     const els = SAVER_ELS();
     els.forEach((el, i) => el.classList.toggle('active', i === idx));
     saverIndex = idx;
     updateDots(idx);
+    DOM.tapHint.classList.toggle('hidden', idx !== 0);
+    if (idx === 1) {
+      DOM.shoppingList.scrollTop = 0;
+      ShoppingList.syncFromSheet();
+    }
   }
 
-  // Cycle saver screens by direction (+1 or -1)
   function switchSaver(dir) {
     const n    = SAVER_ELS().length;
     const next = ((saverIndex + dir) % n + n) % n;
@@ -906,24 +903,9 @@ const Modes = (() => {
   }
 
   function activateScreensaver() {
-    if (current === 'saver') return;
-    current = 'saver';
-    DOM.shopping.classList.remove('active');
-    showSaver(saverIndex);
-    ShoppingList.exitSelectionMode();
+    showSaver(0);
   }
 
-  function activateShopping() {
-    if (current === 'shopping') return;
-    current = 'shopping';
-    SAVER_ELS().forEach(el => el.classList.remove('active'));
-    DOM.shopping.classList.add('active');
-    DOM.shoppingList.scrollTop = 0;
-    ShoppingList.syncFromSheet();
-    DOM.tapHint.classList.add('hidden');
-  }
-
-  function getCurrent()    { return current; }
   function getSaverIndex() { return saverIndex; }
 
   function initButton() {
@@ -931,15 +913,11 @@ const Modes = (() => {
       e.stopPropagation();
       activateScreensaver();
     });
-    DOM.btnCart0.addEventListener('click', e => { e.stopPropagation(); activateShopping(); });
-    DOM.btnCart1.addEventListener('click', e => { e.stopPropagation(); activateShopping(); });
   }
 
   return {
     activateScreensaver,
-    activateShopping,
     switchSaver,
-    getCurrent,
     getSaverIndex,
     initButton,
   };
@@ -947,56 +925,30 @@ const Modes = (() => {
 
 /* ═══════════════════════════════════════════════════════════
    MODULE: SwipeHandler
-   On saver screens:
-     - Horizontal swipe → cycle saver sub-screens
-     - Tap (no significant movement, no button target) → open shopping
-   On shopping screen: no navigation (handled by button + inactivity)
+   Horizontal swipe anywhere → cycle screens circularly.
+   Vertical movement is ignored so list scrolling still works.
 ═══════════════════════════════════════════════════════════ */
 const SwipeHandler = (() => {
-  const SWIPE_THRESHOLD = 55;   // minimum horizontal px to count as a swipe
-  const TAP_MAX_MOVE    = 18;   // max movement in px to still count as a tap
-  const TAP_MAX_MS      = 350;  // max duration in ms to count as a tap
+  const SWIPE_THRESHOLD = 55;
 
-  let startX = 0, startY = 0, startTime = 0;
+  let startX = 0, startY = 0;
 
   function init() {
     document.addEventListener('touchstart', e => {
-      startX    = e.touches[0].clientX;
-      startY    = e.touches[0].clientY;
-      startTime = Date.now();
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
     }, { passive: true });
 
     document.addEventListener('touchend', e => {
-      if (Modes.getCurrent() !== 'saver') return;
-
       const dx    = e.changedTouches[0].clientX - startX;
       const dy    = e.changedTouches[0].clientY - startY;
-      const dt    = Date.now() - startTime;
       const absDx = Math.abs(dx);
       const absDy = Math.abs(dy);
 
-      const isHSwipe = absDx >= SWIPE_THRESHOLD && absDx > absDy * 1.5 && dt < 600;
-      const isTap    = absDx < TAP_MAX_MOVE && absDy < TAP_MAX_MOVE && dt < TAP_MAX_MS;
-
-      if (isHSwipe) {
-        // swipe left (dx < 0) → next screen; swipe right (dx > 0) → prev screen
+      if (absDx >= SWIPE_THRESHOLD && absDx > absDy * 1.5) {
         Modes.switchSaver(dx < 0 ? 1 : -1);
-      } else if (isTap && Modes.getSaverIndex() === 0) {
-        // Only the clock/weather screen (index 0) opens shopping on tap.
-        // The news screen (index 1) is read-only — touches scroll the feed.
-        const target = e.target;
-        if (target.closest('button, a, input, select')) return;
-        Modes.activateShopping();
       }
     }, { passive: true });
-
-    // Mouse fallback for desktop testing — same rule: only from screen 0
-    document.addEventListener('click', e => {
-      if (Modes.getCurrent() !== 'saver') return;
-      if (Modes.getSaverIndex() !== 0) return;
-      if (e.target.closest('button, a, input, select')) return;
-      Modes.activateShopping();
-    });
   }
 
   return { init };

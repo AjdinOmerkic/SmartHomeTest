@@ -872,12 +872,6 @@ html, body {
   z-index: 2;
 }
 
-.news-header-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 2vw;
-}
 
 
 .news-updated {
@@ -941,13 +935,6 @@ html, body {
   font-size: clamp(14px, 2.4vw, 18px);
 }
 
-/* Cart button pinned to top-right of screensaver */
-.saver-cart-top {
-  position: absolute;
-  top: 4vh;
-  right: 5vw;
-  z-index: 5;
-}
 
 /* ─── News article popup ────────────────────────────────── */
 .news-popup {
