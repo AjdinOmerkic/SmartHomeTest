@@ -55,6 +55,12 @@ const CONFIG = {
     updateIntervalMs: 60_000,    // refresh every 1 minute
   },
 
+  /* ── Photos slideshow (Google Drive via Apps Script) ────── */
+  photos: {
+    scriptUrl: 'https://script.google.com/macros/s/AKfycbzVRspECkkjggF8WKkljXF3sVElEXUTDmDVW71iLvazXRKu_sX9xh1VMKgRJ1SyjL1U/exec',
+    cycleMs:   30 * 60 * 1000,  // rotate every 30 minutes
+  },
+
 };
 
 /* ═══════════════════════════════════════════════════════════
@@ -1331,48 +1337,34 @@ const Climate = (() => {
    long-press anywhere skips early and resets the timer.
 ═══════════════════════════════════════════════════════════ */
 const Flowers = (() => {
-  const CYCLE_MS   = 30 * 60 * 1000;
-  const MET        = 'https://collectionapi.metmuseum.org/public/collection/v1/';
-  // Public-domain flower / botanical art across all artistic media
-  const SEARCH_URL = MET + 'search?hasImages=true&isPublicDomain=true&q=botanical+floral+flowers';
-
-  let objectIds       = [];
+  let imageUrls       = [];
   let usedSet         = new Set();
   let frontEl         = null;
   let cycleTimer      = null;
   let isTransitioning = false;
 
-  // Fetch and shuffle the list of matching object IDs (done once)
-  async function loadIds() {
-    if (objectIds.length) return;
-    const res  = await fetch(SEARCH_URL);
+  // Fetch image URLs from Google Drive via Apps Script (done once)
+  async function loadUrls() {
+    if (imageUrls.length) return;
+    const res  = await fetch(CONFIG.photos.scriptUrl);
     const data = await res.json();
-    const ids  = data.objectIDs || [];
-    // Fisher-Yates shuffle so we don't always start from the same works
-    for (let i = ids.length - 1; i > 0; i--) {
+    const urls = data.urls || [];
+    // Fisher-Yates shuffle
+    for (let i = urls.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
-      [ids[i], ids[j]] = [ids[j], ids[i]];
+      [urls[i], urls[j]] = [urls[j], urls[i]];
     }
-    objectIds = ids;
+    imageUrls = urls;
   }
 
-  // Pick an unused object ID, fetch its primaryImage URL
-  async function nextImageUrl() {
-    let pool = objectIds.filter(id => !usedSet.has(id));
-    if (!pool.length) { usedSet.clear(); pool = [...objectIds]; }
-
-    for (let attempt = 0; attempt < 8; attempt++) {
-      const idx = Math.floor(Math.random() * pool.length);
-      const id  = pool.splice(idx, 1)[0];
-      usedSet.add(id);
-      try {
-        const res = await fetch(MET + 'objects/' + id);
-        const obj = await res.json();
-        const url = obj.primaryImage || obj.primaryImageSmall;
-        if (url) return url;
-      } catch { /* try next */ }
-    }
-    return null;
+  // Pick an unused URL, cycling back when all have been shown
+  function nextImageUrl() {
+    let pool = imageUrls.filter(u => !usedSet.has(u));
+    if (!pool.length) { usedSet.clear(); pool = [...imageUrls]; }
+    const idx = Math.floor(Math.random() * pool.length);
+    const url = pool[idx];
+    usedSet.add(url);
+    return url || null;
   }
 
   // Crossfade the incoming layer, resolve when the transition ends
@@ -1407,14 +1399,14 @@ const Flowers = (() => {
     isTransitioning = true;
 
     try {
-      const url = await nextImageUrl();
+      const url = nextImageUrl();
       if (url) await crossfade(url);
     } catch (e) {
       console.warn('[Flowers]', e.message);
     }
 
     isTransitioning = false;
-    cycleTimer = setTimeout(loadNext, CYCLE_MS);
+    cycleTimer = setTimeout(loadNext, CONFIG.photos.cycleMs);
   }
 
   function addLongPress(el, cb) {
@@ -1437,8 +1429,8 @@ const Flowers = (() => {
     DOM.flowersLayerB.style.opacity = '0';
 
     try {
-      await loadIds();
-      const url = await nextImageUrl();
+      await loadUrls();
+      const url = nextImageUrl();
       if (url) {
         DOM.flowersLayerA.style.backgroundImage = 'url(' + url + ')';
         await new Promise((resolve, reject) => {
@@ -1453,7 +1445,7 @@ const Flowers = (() => {
       console.warn('[Flowers] init:', e.message);
     }
 
-    cycleTimer = setTimeout(loadNext, CYCLE_MS);
+    cycleTimer = setTimeout(loadNext, CONFIG.photos.cycleMs);
     addLongPress(DOM.flowers, loadNext);
   }
 
