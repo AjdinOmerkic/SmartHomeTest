@@ -57,7 +57,7 @@ const CONFIG = {
 
   /* ── Photos slideshow (Google Drive via Apps Script) ────── */
   photos: {
-    scriptUrl: 'https://script.google.com/macros/s/AKfycbzVRspECkkjggF8WKkljXF3sVElEXUTDmDVW71iLvazXRKu_sX9xh1VMKgRJ1SyjL1U/exec',
+    scriptUrl: 'https://script.google.com/macros/s/AKfycbzylyu4ziQcyXcZ9hbNvyeqaLZr3E9oPg06WFGC6VkRht1mvePwJYYtQZLekSP-_h6s/exec',
     cycleMs:   30 * 60 * 1000,  // rotate every 30 minutes
   },
 
@@ -1398,11 +1398,10 @@ const Flowers = (() => {
     clearTimeout(cycleTimer);
     isTransitioning = true;
 
-    try {
+    for (let attempt = 0; attempt < 5; attempt++) {
       const url = nextImageUrl();
-      if (url) await crossfade(url);
-    } catch (e) {
-      console.warn('[Flowers]', e.message);
+      if (!url) break;
+      try { await crossfade(url); break; } catch { /* try next */ }
     }
 
     isTransitioning = false;
@@ -1430,16 +1429,20 @@ const Flowers = (() => {
 
     try {
       await loadUrls();
-      const url = nextImageUrl();
-      if (url) {
-        DOM.flowersLayerA.style.backgroundImage = 'url(' + url + ')';
-        await new Promise((resolve, reject) => {
+      for (let attempt = 0; attempt < 5; attempt++) {
+        const url = nextImageUrl();
+        if (!url) break;
+        const loaded = await new Promise(resolve => {
           const img = new Image();
-          img.onload  = resolve;
-          img.onerror = reject;
+          img.onload  = () => resolve(url);
+          img.onerror = () => resolve(null);
           img.src     = url;
         });
-        DOM.flowersLayerA.style.opacity = '1';
+        if (loaded) {
+          DOM.flowersLayerA.style.backgroundImage = 'url(' + loaded + ')';
+          DOM.flowersLayerA.style.opacity = '1';
+          break;
+        }
       }
     } catch (e) {
       console.warn('[Flowers] init:', e.message);
